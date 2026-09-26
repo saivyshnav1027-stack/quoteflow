@@ -55,7 +55,8 @@ app.get(['/api/customer-types', '/customer-types'], async (_req, res) => {
 app.put(['/api/customer-types/:id', '/customer-types/:id'], async (req, res) => {
   try {
     const id = Number(req.params.id)
-    const markup = Number(req.body.markup)
+    const rawMarkup = req.body?.markup !== undefined ? req.body.markup : req.body?.markupPercentage
+    const markup = Number(rawMarkup !== undefined ? rawMarkup : 0)
 
     if (!Number.isInteger(id)) {
       return res.status(400).json({ success: false, message: 'Invalid customer type ID' })

@@ -30,11 +30,26 @@ export default async function handler(req, res) {
 
   if (method === 'PUT') {
     try {
-      const id = Number(req.query.id || req.body?.id)
-      const markupPercentage = Number(req.body?.markupPercentage ?? 0)
+      let body = req.body
+      if (typeof body === 'string') {
+        try {
+          body = JSON.parse(body)
+        } catch {
+          body = {}
+        }
+      }
+      body = body || {}
 
-      if (!id) {
+      const id = Number(req.query?.id || body.id)
+      const rawMarkup = body.markup !== undefined ? body.markup : body.markupPercentage
+      const markupPercentage = Number(rawMarkup !== undefined ? rawMarkup : 0)
+
+      if (!id || Number.isNaN(id)) {
         return res.status(400).json({ success: false, message: 'Invalid customer type ID' })
+      }
+
+      if (Number.isNaN(markupPercentage)) {
+        return res.status(400).json({ success: false, message: 'Invalid markup percentage' })
       }
 
       await db.execute({
@@ -42,7 +57,16 @@ export default async function handler(req, res) {
         args: [markupPercentage, id],
       })
 
-      return res.status(200).json({ success: true, message: 'Customer tier updated successfully' })
+      const fetchRes = await db.execute({
+        sql: `SELECT id, type_name, markup_percentage FROM customer_types WHERE id = ?`,
+        args: [id],
+      })
+
+      return res.status(200).json({ 
+        success: true, 
+        message: 'Customer tier updated successfully',
+        customerType: fetchRes.rows[0]
+      })
     } catch (error) {
       console.error('Update tier error:', error)
       return res.status(500).json({ success: false, message: 'Failed to update customer tier', error: String(error) })

@@ -2235,15 +2235,51 @@ function App() {
               </button>
               <button
                 onClick={async () => {
-                  await fetch(`${API_BASE}/customer-types/${editTier.id}`, {
-                    method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ markup: tierMarkupInput }),
-                  })
-                  loadCustomerTypes()
-                  setEditTier(null)
+                  if (!editTier) return
+                  try {
+                    const newMarkup = Number(tierMarkupInput) || 0
+
+                    // Optimistic update in customerTypes
+                    setCustomerTypes((prev) =>
+                      prev.map((t) => (t.id === editTier.id ? { ...t, markup_percentage: newMarkup } : t))
+                    )
+
+                    // Update customers list in memory
+                    setCustomers((prev) =>
+                      prev.map((c) =>
+                        c.customer_type_id === editTier.id
+                          ? { ...c, markup_percentage: newMarkup }
+                          : c
+                      )
+                    )
+
+                    // If currently active customer belongs to this tier, update them
+                    if (selectedCustomer && selectedCustomer.customer_type_id === editTier.id) {
+                      setSelectedCustomer((prev) => ({
+                        ...prev,
+                        markup_percentage: newMarkup,
+                      }))
+                    }
+
+                    // Call backend API
+                    await fetch(`${API_BASE}/customer-types/${editTier.id}`, {
+                      method: 'PUT',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ 
+                        markup: newMarkup,
+                        markupPercentage: newMarkup 
+                      }),
+                    })
+
+                    loadCustomerTypes()
+                    loadCustomers()
+                  } catch (err) {
+                    console.error('Save margin error:', err)
+                  } finally {
+                    setEditTier(null)
+                  }
                 }}
-                className="rounded-xl bg-blue-600 px-4 py-2 text-xs font-bold text-white hover:bg-blue-700"
+                className="rounded-xl bg-blue-600 px-4 py-2 text-xs font-bold text-white hover:bg-blue-700 cursor-pointer shadow-sm"
               >
                 Save Margin
               </button>
