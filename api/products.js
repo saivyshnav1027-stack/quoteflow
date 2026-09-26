@@ -3,13 +3,16 @@ import { createClient } from '@libsql/client/web'
 const DEFAULT_TURSO_URL = 'libsql://quoteflow-db-saivyshnav1027-stack.aws-ap-south-1.turso.io'
 const DEFAULT_TURSO_TOKEN = 'eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJhIjoicnciLCJpYXQiOjE3OTA0NDg3MjQsImlkIjoiMDFhMGRmMGMtYmQwMS03OWQ1LTkyYTUtMjE2MDdhN2U1N2M5Iiwia2lkIjoiR2swVEt2LUphQmVGMkxaVHFSV3RDYUltOFE4YnIweHBFVFlDUzJzMXFaayIsInJpZCI6IjUzYTAyNmI5LWQxNmEtNDc2Yi1hYzg3LWFiOTVhMWY1YzNmNCJ9.B44Vmgfr2EWmCJu-h3xorAv7wePo5Sq97Rdhmr0FdYYYSiy2Wrur1kEEW-ALINqb-f_7QnhfOgOTxUNBSY8bBA'
 
-const db = createClient({
-  url: process.env.TURSO_DATABASE_URL || DEFAULT_TURSO_URL,
-  authToken: process.env.TURSO_AUTH_TOKEN || DEFAULT_TURSO_TOKEN,
-})
+function getDb() {
+  return createClient({
+    url: DEFAULT_TURSO_URL,
+    authToken: DEFAULT_TURSO_TOKEN,
+  })
+}
 
 export default async function handler(req, res) {
   const method = req.method?.toUpperCase()
+  const db = getDb()
 
   if (method === 'GET') {
     try {
@@ -21,7 +24,7 @@ export default async function handler(req, res) {
       return res.status(200).json(result.rows)
     } catch (error) {
       console.error('Fetch products error:', error)
-      return res.status(500).json({ success: false, message: 'Failed to fetch products' })
+      return res.status(500).json({ success: false, message: 'Failed to fetch products', error: String(error) })
     }
   }
 
@@ -71,7 +74,7 @@ export default async function handler(req, res) {
       })
     } catch (error) {
       console.error('Add product error:', error)
-      return res.status(500).json({ success: false, message: 'Failed to add product' })
+      return res.status(500).json({ success: false, message: 'Failed to add product', error: String(error) })
     }
   }
 
@@ -103,7 +106,7 @@ export default async function handler(req, res) {
       return res.status(200).json({ success: true, message: 'Product updated successfully' })
     } catch (error) {
       console.error('Update product error:', error)
-      return res.status(500).json({ success: false, message: 'Failed to update product' })
+      return res.status(500).json({ success: false, message: 'Failed to update product', error: String(error) })
     }
   }
 
@@ -120,7 +123,7 @@ export default async function handler(req, res) {
       return res.status(200).json({ success: true, message: 'Product deleted successfully' })
     } catch (error) {
       console.error('Delete product error:', error)
-      return res.status(500).json({ success: false, message: 'Failed to delete product' })
+      return res.status(500).json({ success: false, message: 'Failed to delete product', error: String(error) })
     }
   }
 

@@ -3,14 +3,17 @@ import { createClient } from '@libsql/client/web'
 const DEFAULT_TURSO_URL = 'libsql://quoteflow-db-saivyshnav1027-stack.aws-ap-south-1.turso.io'
 const DEFAULT_TURSO_TOKEN = 'eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJhIjoicnciLCJpYXQiOjE3OTA0NDg3MjQsImlkIjoiMDFhMGRmMGMtYmQwMS03OWQ1LTkyYTUtMjE2MDdhN2U1N2M5Iiwia2lkIjoiR2swVEt2LUphQmVGMkxaVHFSV3RDYUltOFE4YnIweHBFVFlDUzJzMXFaayIsInJpZCI6IjUzYTAyNmI5LWQxNmEtNDc2Yi1hYzg3LWFiOTVhMWY1YzNmNCJ9.B44Vmgfr2EWmCJu-h3xorAv7wePo5Sq97Rdhmr0FdYYYSiy2Wrur1kEEW-ALINqb-f_7QnhfOgOTxUNBSY8bBA'
 
-const db = createClient({
-  url: process.env.TURSO_DATABASE_URL || DEFAULT_TURSO_URL,
-  authToken: process.env.TURSO_AUTH_TOKEN || DEFAULT_TURSO_TOKEN,
-})
+function getDb() {
+  return createClient({
+    url: DEFAULT_TURSO_URL,
+    authToken: DEFAULT_TURSO_TOKEN,
+  })
+}
 
 export default async function handler(req, res) {
   const method = req.method?.toUpperCase()
   const id = req.query.id ? Number(req.query.id) : null
+  const db = getDb()
 
   if (method === 'GET') {
     if (id) {
@@ -67,7 +70,7 @@ export default async function handler(req, res) {
         })
       } catch (error) {
         console.error('Fetch quotation error:', error)
-        return res.status(500).json({ success: false, message: 'Failed to fetch quotation details' })
+        return res.status(500).json({ success: false, message: 'Failed to fetch quotation details', error: String(error) })
       }
     }
 
@@ -93,7 +96,7 @@ export default async function handler(req, res) {
       return res.status(200).json(result.rows)
     } catch (error) {
       console.error('Fetch quotations error:', error)
-      return res.status(500).json({ success: false, message: 'Failed to fetch quotation history' })
+      return res.status(500).json({ success: false, message: 'Failed to fetch quotation history', error: String(error) })
     }
   }
 
@@ -204,7 +207,7 @@ export default async function handler(req, res) {
       })
     } catch (error) {
       console.error('Create quotation error:', error)
-      return res.status(500).json({ success: false, message: 'Failed to create quotation' })
+      return res.status(500).json({ success: false, message: 'Failed to create quotation', error: String(error) })
     }
   }
 
