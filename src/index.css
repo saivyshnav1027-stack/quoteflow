@@ -1,10 +1,44 @@
 @import "tailwindcss";
 
-* {
-  box-sizing: border-box;
+@layer base {
+  * {
+    box-sizing: border-box;
+  }
+
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    background-color: #f8fafc;
+    color: #0f172a;
+    -webkit-font-smoothing: antialiased;
+  }
 }
 
-body {
-  margin: 0;
-  font-family: Arial, Helvetica, sans-serif;
+/* Custom Print Rules for Physical Slip Reproduction */
+@media print {
+  body * {
+    visibility: hidden;
+  }
+
+  #printable-estimate-slip,
+  #printable-estimate-slip * {
+    visibility: visible;
+  }
+
+  #printable-estimate-slip {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    margin: 0;
+    padding: 10px;
+    background: #ffffff !important;
+    color: #000000 !important;
+    box-shadow: none !important;
+    border: none !important;
+  }
+
+  .no-print {
+    display: none !important;
+  }
 }

@@ -26,3 +26,11 @@ dist-ssr
 .env
 .env.*
 !.env.example
+
+# Local SQLite databases
+*.db
+*.sqlite
+
+# Stitch UI designs
+stitch_rural_trading_quote_estimator/
+

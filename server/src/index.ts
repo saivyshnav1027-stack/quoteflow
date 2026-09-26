@@ -1,309 +1,178 @@
 import express from 'express'
 import cors from 'cors'
-import { db } from './db'
+import { db, isUsingTurso } from './db'
+import { initSchema } from './schema'
 
 const app = express()
 
 app.use(cors())
 app.use(express.json())
 
-// =====================================================
-// TEST DATABASE CONNECTION
-// =====================================================
+// Ensure schema is initialized on boot
+initSchema().catch((err) => console.error('[DB Boot Init Error]', err))
 
+// =====================================================
+// 1. HEALTH / DATABASE STATUS
+// =====================================================
 app.get('/api/test-db', async (_req, res) => {
   try {
     const result = await db.execute('SELECT 1 AS connected')
-
     res.json({
       success: true,
-      message: 'QuoteFlow connected to Turso successfully!',
+      message: isUsingTurso
+        ? 'QuoteFlow connected to Turso Cloud DB successfully!'
+        : 'QuoteFlow connected to Local SQLite (file:local.db) successfully!',
+      isUsingTurso,
       result: result.rows,
     })
   } catch (error) {
-    console.error(error)
-
+    console.error('Database connection error:', error)
     res.status(500).json({
       success: false,
       message: 'Database connection failed',
+      error: String(error),
     })
   }
 })
 
 // =====================================================
-// CUSTOMER TYPES
+// 2. CUSTOMER TYPES (TIERS)
 // =====================================================
-
-// GET ALL CUSTOMER TYPES
 app.get('/api/customer-types', async (_req, res) => {
   try {
     const result = await db.execute(`
-      SELECT
-        id,
-        type_name,
-        markup_percentage
+      SELECT id, type_name, markup_percentage
       FROM customer_types
       ORDER BY id
     `)
-
     res.json(result.rows)
   } catch (error) {
-    console.error(error)
-
-    res.status(500).json({
-      success: false,
-      message: 'Failed to fetch customer types',
-    })
+    console.error('Fetch customer types error:', error)
+    res.status(500).json({ success: false, message: 'Failed to fetch customer types' })
   }
 })
 
-// UPDATE CUSTOMER TYPE MARKUP
 app.put('/api/customer-types/:id', async (req, res) => {
   try {
     const id = Number(req.params.id)
     const markup = Number(req.body.markup)
 
     if (!Number.isInteger(id)) {
-      return res.status(400).json({
-        success: false,
-        message: 'Invalid customer type ID',
-      })
+      return res.status(400).json({ success: false, message: 'Invalid customer type ID' })
     }
 
-    if (Number.isNaN(markup) || markup < 0) {
-      return res.status(400).json({
-        success: false,
-        message: 'Invalid markup percentage',
-      })
+    if (Number.isNaN(markup)) {
+      return res.status(400).json({ success: false, message: 'Invalid markup percentage' })
     }
 
     await db.execute({
-      sql: `
-        UPDATE customer_types
-        SET markup_percentage = ?
-        WHERE id = ?
-      `,
+      sql: `UPDATE customer_types SET markup_percentage = ? WHERE id = ?`,
       args: [markup, id],
     })
 
     const result = await db.execute({
-      sql: `
-        SELECT
-          id,
-          type_name,
-          markup_percentage
-        FROM customer_types
-        WHERE id = ?
-      `,
+      sql: `SELECT id, type_name, markup_percentage FROM customer_types WHERE id = ?`,
       args: [id],
     })
 
-    res.json({
-      success: true,
-      customerType: result.rows[0],
-    })
+    res.json({ success: true, customerType: result.rows[0] })
   } catch (error) {
-    console.error(error)
-
-    res.status(500).json({
-      success: false,
-      message: 'Failed to update customer type',
-    })
+    console.error('Update customer type error:', error)
+    res.status(500).json({ success: false, message: 'Failed to update customer type' })
   }
 })
 
 // =====================================================
-// CUSTOMERS
+// 3. CUSTOMERS
 // =====================================================
-
-// GET ALL CUSTOMERS
 app.get('/api/customers', async (_req, res) => {
   try {
     const result = await db.execute(`
       SELECT
-        customers.id,
-        customers.customer_name,
-        customers.phone,
-        customers.customer_type_id,
-        customer_types.type_name,
-        customer_types.markup_percentage
-      FROM customers
-      JOIN customer_types
-        ON customers.customer_type_id = customer_types.id
-      ORDER BY customers.id DESC
+        c.id,
+        c.customer_name,
+        c.phone,
+        c.customer_type_id,
+        ct.type_name,
+        ct.markup_percentage
+      FROM customers c
+      LEFT JOIN customer_types ct ON c.customer_type_id = ct.id
+      ORDER BY c.id DESC
     `)
-
     res.json(result.rows)
   } catch (error) {
-    console.error(error)
-
-    res.status(500).json({
-      success: false,
-      message: 'Failed to fetch customers',
-    })
+    console.error('Fetch customers error:', error)
+    res.status(500).json({ success: false, message: 'Failed to fetch customers' })
   }
 })
 
-// ADD CUSTOMER
 app.post('/api/customers', async (req, res) => {
   try {
     const customerName = String(req.body.customerName ?? '').trim()
     const phone = String(req.body.phone ?? '').trim()
-    const customerTypeId = Number(req.body.customerTypeId)
+    const customerTypeId = Number(req.body.customerTypeId || 1)
 
     if (!customerName) {
-      return res.status(400).json({
-        success: false,
-        message: 'Customer name is required',
-      })
-    }
-
-    if (!phone) {
-      return res.status(400).json({
-        success: false,
-        message: 'Phone number is required',
-      })
-    }
-
-    if (!Number.isInteger(customerTypeId)) {
-      return res.status(400).json({
-        success: false,
-        message: 'Valid customer type is required',
-      })
-    }
-
-    const customerType = await db.execute({
-      sql: `
-        SELECT id
-        FROM customer_types
-        WHERE id = ?
-      `,
-      args: [customerTypeId],
-    })
-
-    if (customerType.rows.length === 0) {
-      return res.status(400).json({
-        success: false,
-        message: 'Customer type does not exist',
-      })
+      return res.status(400).json({ success: false, message: 'Customer name is required' })
     }
 
     const result = await db.execute({
-      sql: `
-        INSERT INTO customers
-        (customer_name, phone, customer_type_id)
-        VALUES (?, ?, ?)
-      `,
+      sql: `INSERT INTO customers (customer_name, phone, customer_type_id) VALUES (?, ?, ?)`,
       args: [customerName, phone, customerTypeId],
+    })
+
+    const createdId = Number(result.lastInsertRowid)
+
+    const fetchResult = await db.execute({
+      sql: `
+        SELECT c.id, c.customer_name, c.phone, c.customer_type_id, ct.type_name, ct.markup_percentage
+        FROM customers c
+        LEFT JOIN customer_types ct ON c.customer_type_id = ct.id
+        WHERE c.id = ?
+      `,
+      args: [createdId],
     })
 
     res.status(201).json({
       success: true,
-      customer: {
-        id: Number(result.lastInsertRowid),
-        customerName,
-        phone,
-        customerTypeId,
-      },
+      customer: fetchResult.rows[0],
     })
   } catch (error) {
-    console.error(error)
-
-    res.status(500).json({
-      success: false,
-      message: 'Failed to create customer',
-    })
+    console.error('Create customer error:', error)
+    res.status(500).json({ success: false, message: 'Failed to create customer' })
   }
 })
 
-// EDIT CUSTOMER
 app.put('/api/customers/:id', async (req, res) => {
   try {
     const id = Number(req.params.id)
     const customerName = String(req.body.customerName ?? '').trim()
     const phone = String(req.body.phone ?? '').trim()
-    const customerTypeId = Number(req.body.customerTypeId)
+    const customerTypeId = Number(req.body.customerTypeId || 1)
 
     if (!Number.isInteger(id)) {
-      return res.status(400).json({
-        success: false,
-        message: 'Invalid customer ID',
-      })
+      return res.status(400).json({ success: false, message: 'Invalid customer ID' })
     }
 
     if (!customerName) {
-      return res.status(400).json({
-        success: false,
-        message: 'Customer name is required',
-      })
-    }
-
-    if (!phone) {
-      return res.status(400).json({
-        success: false,
-        message: 'Phone number is required',
-      })
-    }
-
-    if (!Number.isInteger(customerTypeId)) {
-      return res.status(400).json({
-        success: false,
-        message: 'Valid customer type is required',
-      })
-    }
-
-    const customerType = await db.execute({
-      sql: `
-        SELECT id
-        FROM customer_types
-        WHERE id = ?
-      `,
-      args: [customerTypeId],
-    })
-
-    if (customerType.rows.length === 0) {
-      return res.status(400).json({
-        success: false,
-        message: 'Customer type does not exist',
-      })
+      return res.status(400).json({ success: false, message: 'Customer name is required' })
     }
 
     await db.execute({
-      sql: `
-        UPDATE customers
-        SET
-          customer_name = ?,
-          phone = ?,
-          customer_type_id = ?
-        WHERE id = ?
-      `,
-      args: [
-        customerName,
-        phone,
-        customerTypeId,
-        id,
-      ],
+      sql: `UPDATE customers SET customer_name = ?, phone = ?, customer_type_id = ? WHERE id = ?`,
+      args: [customerName, phone, customerTypeId, id],
     })
 
-    res.json({
-      success: true,
-      message: 'Customer updated successfully',
-    })
+    res.json({ success: true, message: 'Customer updated successfully' })
   } catch (error) {
-    console.error(error)
-
-    res.status(500).json({
-      success: false,
-      message: 'Failed to update customer',
-    })
+    console.error('Update customer error:', error)
+    res.status(500).json({ success: false, message: 'Failed to update customer' })
   }
 })
 
 // =====================================================
-// PRODUCTS
+// 4. PRODUCTS (INVENTORY)
 // =====================================================
-
-// GET ALL PRODUCTS
 app.get('/api/products', async (_req, res) => {
   try {
     const result = await db.execute(`
@@ -311,518 +180,268 @@ app.get('/api/products', async (_req, res) => {
         id,
         product_code,
         product_name,
+        unit,
+        list_price,
+        discount_percentage,
         cost_price,
-        stock_quantity
+        stock_quantity,
+        created_at
       FROM products
       ORDER BY id DESC
     `)
-
     res.json(result.rows)
   } catch (error) {
-    console.error(error)
-
-    res.status(500).json({
-      success: false,
-      message: 'Failed to fetch products',
-    })
+    console.error('Fetch products error:', error)
+    res.status(500).json({ success: false, message: 'Failed to fetch products' })
   }
 })
 
-// ADD PRODUCT
 app.post('/api/products', async (req, res) => {
   try {
-    const productCode = String(req.body.productCode ?? '').trim()
+    let productCode = String(req.body.productCode ?? '').trim()
     const productName = String(req.body.productName ?? '').trim()
-    const costPrice = Number(req.body.costPrice)
-    const stockQuantity = Number(req.body.stockQuantity)
-
-    if (!productCode) {
-      return res.status(400).json({
-        success: false,
-        message: 'Product code is required',
-      })
-    }
+    const unit = String(req.body.unit ?? 'Pcs.').trim()
+    const listPrice = Number(req.body.listPrice || 0)
+    const discountPercentage = Number(req.body.discountPercentage || 0)
+    let costPrice = Number(req.body.costPrice || 0)
+    const stockQuantity = Number(req.body.stockQuantity || 100)
 
     if (!productName) {
-      return res.status(400).json({
-        success: false,
-        message: 'Product name is required',
-      })
+      return res.status(400).json({ success: false, message: 'Product name is required' })
     }
 
-    if (Number.isNaN(costPrice) || costPrice < 0) {
-      return res.status(400).json({
-        success: false,
-        message: 'Valid cost price is required',
-      })
+    // Auto-generate code if empty
+    if (!productCode) {
+      const countRes = await db.execute('SELECT COUNT(*) as count FROM products')
+      const nextNum = Number(countRes.rows[0].count) + 1
+      productCode = `SKU-${String(nextNum).padStart(4, '0')}`
     }
 
-    if (
-      Number.isNaN(stockQuantity) ||
-      !Number.isInteger(stockQuantity) ||
-      stockQuantity < 0
-    ) {
-      return res.status(400).json({
-        success: false,
-        message: 'Valid stock quantity is required',
-      })
+    // Default cost price calculation if 0
+    if (costPrice <= 0 && listPrice > 0) {
+      costPrice = Number((listPrice * (1 - discountPercentage / 100)).toFixed(2))
     }
 
-    const existingProduct = await db.execute({
-      sql: `
-        SELECT id
-        FROM products
-        WHERE product_code = ?
-      `,
+    // Check unique code
+    const existing = await db.execute({
+      sql: `SELECT id FROM products WHERE product_code = ?`,
       args: [productCode],
     })
 
-    if (existingProduct.rows.length > 0) {
-      return res.status(400).json({
-        success: false,
-        message: 'Product code already exists',
-      })
+    if (existing.rows.length > 0) {
+      // Append random suffix
+      productCode = `${productCode}-${Math.floor(100 + Math.random() * 900)}`
     }
 
     const result = await db.execute({
       sql: `
-        INSERT INTO products
-        (
-          product_code,
-          product_name,
-          cost_price,
-          stock_quantity
-        )
-        VALUES (?, ?, ?, ?)
+        INSERT INTO products 
+        (product_code, product_name, unit, list_price, discount_percentage, cost_price, stock_quantity)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
       `,
-      args: [
-        productCode,
-        productName,
-        costPrice,
-        stockQuantity,
-      ],
+      args: [productCode, productName, unit, listPrice, discountPercentage, costPrice, stockQuantity],
+    })
+
+    const newId = Number(result.lastInsertRowid)
+    const fetchRes = await db.execute({
+      sql: `SELECT * FROM products WHERE id = ?`,
+      args: [newId],
     })
 
     res.status(201).json({
       success: true,
-      product: {
-        id: Number(result.lastInsertRowid),
-        productCode,
-        productName,
-        costPrice,
-        stockQuantity,
-      },
+      product: fetchRes.rows[0],
     })
   } catch (error) {
-    console.error(error)
-
-    res.status(500).json({
-      success: false,
-      message: 'Failed to create product',
-    })
+    console.error('Create product error:', error)
+    res.status(500).json({ success: false, message: 'Failed to create product' })
   }
 })
 
-// EDIT PRODUCT
 app.put('/api/products/:id', async (req, res) => {
   try {
     const id = Number(req.params.id)
-
     const productCode = String(req.body.productCode ?? '').trim()
     const productName = String(req.body.productName ?? '').trim()
-    const costPrice = Number(req.body.costPrice)
-    const stockQuantity = Number(req.body.stockQuantity)
+    const unit = String(req.body.unit ?? 'Pcs.').trim()
+    const listPrice = Number(req.body.listPrice || 0)
+    const discountPercentage = Number(req.body.discountPercentage || 0)
+    const costPrice = Number(req.body.costPrice || 0)
+    const stockQuantity = Number(req.body.stockQuantity || 0)
 
     if (!Number.isInteger(id)) {
-      return res.status(400).json({
-        success: false,
-        message: 'Invalid product ID',
-      })
-    }
-
-    if (!productCode) {
-      return res.status(400).json({
-        success: false,
-        message: 'Product code is required',
-      })
+      return res.status(400).json({ success: false, message: 'Invalid product ID' })
     }
 
     if (!productName) {
-      return res.status(400).json({
-        success: false,
-        message: 'Product name is required',
-      })
-    }
-
-    if (Number.isNaN(costPrice) || costPrice < 0) {
-      return res.status(400).json({
-        success: false,
-        message: 'Valid cost price is required',
-      })
-    }
-
-    if (
-      Number.isNaN(stockQuantity) ||
-      !Number.isInteger(stockQuantity) ||
-      stockQuantity < 0
-    ) {
-      return res.status(400).json({
-        success: false,
-        message: 'Valid stock quantity is required',
-      })
-    }
-
-    const existingProduct = await db.execute({
-      sql: `
-        SELECT id
-        FROM products
-        WHERE product_code = ?
-        AND id != ?
-      `,
-      args: [productCode, id],
-    })
-
-    if (existingProduct.rows.length > 0) {
-      return res.status(400).json({
-        success: false,
-        message: 'Product code already exists',
-      })
-    }
-
-    const product = await db.execute({
-      sql: `
-        SELECT id
-        FROM products
-        WHERE id = ?
-      `,
-      args: [id],
-    })
-
-    if (product.rows.length === 0) {
-      return res.status(404).json({
-        success: false,
-        message: 'Product not found',
-      })
+      return res.status(400).json({ success: false, message: 'Product name is required' })
     }
 
     await db.execute({
       sql: `
         UPDATE products
-        SET
-          product_code = ?,
-          product_name = ?,
-          cost_price = ?,
-          stock_quantity = ?
+        SET product_code = ?, product_name = ?, unit = ?, list_price = ?, discount_percentage = ?, cost_price = ?, stock_quantity = ?
         WHERE id = ?
       `,
-      args: [
-        productCode,
-        productName,
-        costPrice,
-        stockQuantity,
-        id,
-      ],
+      args: [productCode, productName, unit, listPrice, discountPercentage, costPrice, stockQuantity, id],
     })
 
-    res.json({
-      success: true,
-      message: 'Product updated successfully',
-    })
+    res.json({ success: true, message: 'Product updated successfully' })
   } catch (error) {
-    console.error(error)
+    console.error('Update product error:', error)
+    res.status(500).json({ success: false, message: 'Failed to update product' })
+  }
+})
 
-    res.status(500).json({
-      success: false,
-      message: 'Failed to update product',
+app.delete('/api/products/:id', async (req, res) => {
+  try {
+    const id = Number(req.params.id)
+    if (!Number.isInteger(id)) {
+      return res.status(400).json({ success: false, message: 'Invalid product ID' })
+    }
+
+    await db.execute({
+      sql: `DELETE FROM products WHERE id = ?`,
+      args: [id],
     })
+
+    res.json({ success: true, message: 'Product deleted successfully' })
+  } catch (error) {
+    console.error('Delete product error:', error)
+    res.status(500).json({ success: false, message: 'Failed to delete product' })
   }
 })
 
 // =====================================================
-// QUOTATIONS
+// 5. QUOTATIONS / ESTIMATES
 // =====================================================
-
-type QuotationItem = {
-  productId: number
+type EstimateItemInput = {
+  productId?: number
+  description: string
   quantity: number
-  costPrice: number
-  markupPercentage: number
-  quotationPrice: number
+  unit?: string
+  listPrice?: number
+  discountPercentage?: number
+  price: number
   lineTotal: number
 }
 
-// CREATE QUOTATION
 app.post('/api/quotations', async (req, res) => {
   try {
-    const customerId = Number(req.body.customerId)
-    const items: Array<{
-      productId: number
-      quantity: number
-    }> = req.body.items
-
-    // -------------------------------------------------
-    // Validate customer
-    // -------------------------------------------------
-
-    if (!Number.isInteger(customerId)) {
-      return res.status(400).json({
-        success: false,
-        message: 'Valid customer is required',
-      })
-    }
-
-    // -------------------------------------------------
-    // Validate items
-    // -------------------------------------------------
+    const customerId = req.body.customerId ? Number(req.body.customerId) : null
+    const customerName = String(req.body.customerName || 'Guest Walk-In')
+    const customerPhone = String(req.body.customerPhone || '')
+    const customerTypeId = req.body.customerTypeId ? Number(req.body.customerTypeId) : 1
+    const markupPercentage = Number(req.body.markupPercentage || 0)
+    const items: EstimateItemInput[] = req.body.items
 
     if (!Array.isArray(items) || items.length === 0) {
-      return res.status(400).json({
-        success: false,
-        message: 'At least one product is required',
-      })
+      return res.status(400).json({ success: false, message: 'At least one item is required' })
     }
-
-    // -------------------------------------------------
-    // Get customer and current markup
-    // -------------------------------------------------
-
-    const customerResult = await db.execute({
-      sql: `
-        SELECT
-          c.id,
-          c.customer_name,
-          c.customer_type_id,
-          ct.type_name,
-          ct.markup_percentage
-        FROM customers c
-        INNER JOIN customer_types ct
-          ON c.customer_type_id = ct.id
-        WHERE c.id = ?
-      `,
-      args: [customerId],
-    })
-
-    if (customerResult.rows.length === 0) {
-      return res.status(404).json({
-        success: false,
-        message: 'Customer not found',
-      })
-    }
-
-    const customer = customerResult.rows[0]
-
-    const customerTypeId = Number(
-      customer.customer_type_id
-    )
-
-    const markupPercentage = Number(
-      customer.markup_percentage
-    )
-
-    // -------------------------------------------------
-    // Calculate quotation items
-    // -------------------------------------------------
-
-    const quotationItems: QuotationItem[] = []
 
     let subtotal = 0
+    let totalUnits = 0
 
-    for (const item of items) {
-      const productId = Number(item.productId)
-      const quantity = Number(item.quantity)
+    const processedItems = items.map((item) => {
+      const qty = Number(item.quantity || 1)
+      const listPrice = Number(item.listPrice || 0)
+      const dis = Number(item.discountPercentage || 0)
 
-      if (!Number.isInteger(productId)) {
-        return res.status(400).json({
-          success: false,
-          message: 'Invalid product',
-        })
+      let netPrice = Number(item.price)
+      if (Number.isNaN(netPrice) || netPrice <= 0) {
+        netPrice = listPrice > 0 ? Number((listPrice * (1 - dis / 100)).toFixed(2)) : 0
       }
 
-      if (
-        !Number.isInteger(quantity) ||
-        quantity <= 0
-      ) {
-        return res.status(400).json({
-          success: false,
-          message: 'Quantity must be a positive integer',
-        })
+      // Add tier markup if applicable
+      if (markupPercentage > 0) {
+        netPrice = Number((netPrice * (1 + markupPercentage / 100)).toFixed(2))
       }
 
-      // -------------------------------------------------
-      // Get product from database
-      // -------------------------------------------------
-
-      const productResult = await db.execute({
-        sql: `
-          SELECT
-            id,
-            product_code,
-            product_name,
-            cost_price
-          FROM products
-          WHERE id = ?
-        `,
-        args: [productId],
-      })
-
-      if (productResult.rows.length === 0) {
-        return res.status(404).json({
-          success: false,
-          message: `Product ${productId} not found`,
-        })
-      }
-
-      const product = productResult.rows[0]
-
-      const costPrice = Number(product.cost_price)
-
-      // -------------------------------------------------
-      // Calculate quotation price
-      // -------------------------------------------------
-
-      const markupAmount =
-        costPrice * (markupPercentage / 100)
-
-      const quotationPrice =
-        costPrice + markupAmount
-
-      const lineTotal =
-        quotationPrice * quantity
+      const lineTotal = Number((netPrice * qty).toFixed(2))
 
       subtotal += lineTotal
+      totalUnits += qty
 
-      quotationItems.push({
-        productId,
-        quantity,
-        costPrice,
-        markupPercentage,
-        quotationPrice,
+      return {
+        productId: item.productId || null,
+        description: item.description || 'Custom Item',
+        quantity: qty,
+        unit: item.unit || 'Pcs.',
+        listPrice,
+        discountPercentage: dis,
+        price: netPrice,
         lineTotal,
-      })
-    }
-
-    // V1 has no tax or discount
-    const total = subtotal
-
-    // -------------------------------------------------
-    // Generate quotation number
-    // Example: QT-20260922-001
-    // -------------------------------------------------
-
-    const now = new Date()
-
-    const datePart =
-      `${now.getFullYear()}${String(
-        now.getMonth() + 1
-      ).padStart(2, '0')}${String(
-        now.getDate()
-      ).padStart(2, '0')}`
-
-    const countResult = await db.execute(`
-      SELECT COUNT(*) AS count
-      FROM quotations
-    `)
-
-    const quotationCount =
-      Number(countResult.rows[0].count) + 1
-
-    const quotationNumber =
-      `QT-${datePart}-${String(
-        quotationCount
-      ).padStart(3, '0')}`
-
-    // -------------------------------------------------
-    // Save quotation
-    // -------------------------------------------------
-
-    const quotationResult = await db.execute({
-      sql: `
-        INSERT INTO quotations
-        (
-          quotation_number,
-          customer_id,
-          customer_type_id,
-          markup_percentage,
-          subtotal,
-          total
-        )
-        VALUES (?, ?, ?, ?, ?, ?)
-      `,
-      args: [
-        quotationNumber,
-        customerId,
-        customerTypeId,
-        markupPercentage,
-        subtotal,
-        total,
-      ],
+      }
     })
 
-    const quotationId =
-      Number(quotationResult.lastInsertRowid)
+    const total = Number(subtotal.toFixed(2))
+    totalUnits = Number(totalUnits.toFixed(2))
 
-    // -------------------------------------------------
-    // Save quotation items
-    // -------------------------------------------------
+    // Generate Quotation Number
+    const now = new Date()
+    const dateStr = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}`
+    const countRes = await db.execute('SELECT COUNT(*) as count FROM quotations')
+    const nextCount = Number(countRes.rows[0].count) + 1
+    const quotationNumber = `EST-${dateStr}-${String(nextCount).padStart(3, '0')}`
 
-    for (const item of quotationItems) {
+    // Insert master quotation
+    const quoteResult = await db.execute({
+      sql: `
+        INSERT INTO quotations 
+        (quotation_number, customer_id, customer_type_id, markup_percentage, subtotal, total_units, total)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+      `,
+      args: [quotationNumber, customerId, customerTypeId, markupPercentage, total, totalUnits, total],
+    })
+
+    const quotationId = Number(quoteResult.lastInsertRowid)
+
+    // Insert line items
+    for (const item of processedItems) {
       await db.execute({
         sql: `
-          INSERT INTO quotation_items
-          (
-            quotation_id,
-            product_id,
-            quantity,
-            cost_price,
-            markup_percentage,
-            quotation_price,
-            line_total
-          )
-          VALUES (?, ?, ?, ?, ?, ?, ?)
+          INSERT INTO quotation_items 
+          (quotation_id, product_id, description, quantity, unit, list_price, discount_percentage, price, line_total)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         `,
         args: [
           quotationId,
           item.productId,
+          item.description,
           item.quantity,
-          item.costPrice,
-          item.markupPercentage,
-          item.quotationPrice,
+          item.unit,
+          item.listPrice,
+          item.discountPercentage,
+          item.price,
           item.lineTotal,
         ],
       })
     }
 
-    // -------------------------------------------------
-    // Return created quotation
-    // -------------------------------------------------
-
     res.status(201).json({
       success: true,
-      message: 'Quotation created successfully',
-
+      message: 'Quotation generated successfully',
       quotation: {
         id: quotationId,
         quotationNumber,
         customerId,
+        customerName,
+        customerPhone,
         customerTypeId,
         markupPercentage,
-        subtotal,
+        subtotal: total,
+        totalUnits,
         total,
-        items: quotationItems,
+        createdAt: now.toISOString(),
+        items: processedItems,
       },
     })
   } catch (error) {
     console.error('Create quotation error:', error)
-
-    res.status(500).json({
-      success: false,
-      message: 'Failed to create quotation',
-    })
+    res.status(500).json({ success: false, message: 'Failed to create quotation' })
   }
 })
 
-
-// GET QUOTATION HISTORY
 app.get('/api/quotations', async (_req, res) => {
   try {
     const result = await db.execute(`
@@ -830,34 +449,96 @@ app.get('/api/quotations', async (_req, res) => {
         q.id,
         q.quotation_number,
         q.customer_id,
-        c.customer_name,
-        c.phone,
+        COALESCE(c.customer_name, 'Guest Walk-In') AS customer_name,
+        COALESCE(c.phone, '') AS phone,
         q.subtotal,
+        q.total_units,
         q.total,
-        q.created_at
+        q.created_at,
+        COUNT(qi.id) AS item_count
       FROM quotations q
-      INNER JOIN customers c
-        ON q.customer_id = c.id
+      LEFT JOIN customers c ON q.customer_id = c.id
+      LEFT JOIN quotation_items qi ON q.id = qi.quotation_id
+      GROUP BY q.id
       ORDER BY q.id DESC
     `)
-
     res.json(result.rows)
   } catch (error) {
-    console.error('Failed to fetch quotations:', error)
+    console.error('Fetch quotations error:', error)
+    res.status(500).json({ success: false, message: 'Failed to fetch quotation history' })
+  }
+})
 
-    res.status(500).json({
-      success: false,
-      message: 'Failed to fetch quotation history',
+app.get('/api/quotations/:id', async (req, res) => {
+  try {
+    const id = Number(req.params.id)
+    if (!Number.isInteger(id)) {
+      return res.status(400).json({ success: false, message: 'Invalid quotation ID' })
+    }
+
+    const quoteRes = await db.execute({
+      sql: `
+        SELECT
+          q.id,
+          q.quotation_number,
+          q.customer_id,
+          COALESCE(c.customer_name, 'Guest Walk-In') AS customer_name,
+          COALESCE(c.phone, '') AS phone,
+          q.markup_percentage,
+          q.subtotal,
+          q.total_units,
+          q.total,
+          q.created_at
+        FROM quotations q
+        LEFT JOIN customers c ON q.customer_id = c.id
+        WHERE q.id = ?
+      `,
+      args: [id],
     })
+
+    if (quoteRes.rows.length === 0) {
+      return res.status(404).json({ success: false, message: 'Quotation not found' })
+    }
+
+    const itemsRes = await db.execute({
+      sql: `
+        SELECT
+          id,
+          product_id,
+          description,
+          quantity,
+          unit,
+          list_price,
+          discount_percentage,
+          price,
+          line_total
+        FROM quotation_items
+        WHERE quotation_id = ?
+        ORDER BY id ASC
+      `,
+      args: [id],
+    })
+
+    res.json({
+      success: true,
+      quotation: {
+        ...quoteRes.rows[0],
+        items: itemsRes.rows,
+      },
+    })
+  } catch (error) {
+    console.error('Fetch quotation details error:', error)
+    res.status(500).json({ success: false, message: 'Failed to fetch quotation details' })
   }
 })
 
 // =====================================================
 // START SERVER
 // =====================================================
-
-const PORT = 3000
+const PORT = process.env.PORT || 3000
 
 app.listen(PORT, () => {
-  console.log(`QuoteFlow backend running on http://localhost:${PORT}`)
+  console.log(`[QuoteFlow] Sri Venkateshwara Trading Backend running on http://localhost:${PORT}`)
 })
+
+export default app
