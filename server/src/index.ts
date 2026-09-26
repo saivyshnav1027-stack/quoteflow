@@ -376,7 +376,7 @@ app.post(['/api/quotations', '/quotations'], async (req, res) => {
     const dateStr = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}`
     const countRes = await db.execute('SELECT COUNT(*) as count FROM quotations')
     const nextCount = Number(countRes.rows[0].count) + 1
-    const quotationNumber = `EST-${dateStr}-${String(nextCount).padStart(3, '0')}`
+    const quotationNumber = req.body.quotationNumber ? String(req.body.quotationNumber) : `EST-${2353 + nextCount}`
 
     const quoteResult = await db.execute({
       sql: `

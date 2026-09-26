@@ -19,6 +19,16 @@ import {
   FileCheck,
   Check,
   Percent,
+  Receipt,
+  LogOut,
+  Lock,
+  User,
+  ArrowRight,
+  Eye,
+  EyeOff,
+  Sparkles,
+  TrendingUp,
+  AlertCircle,
 } from 'lucide-react'
 
 const API_BASE = '/api'
@@ -89,8 +99,161 @@ const formatINR = (val: number) => {
   }).format(val || 0)
 }
 
+// ============================================================
+// LOGIN SCREEN COMPONENT (SHOPKEEPER PORTAL)
+// ============================================================
+function LoginScreen({ onLogin }: { onLogin: () => void }) {
+  const [phone, setPhone] = useState('+91 98480 12345')
+  const [pin, setPin] = useState('1234')
+  const [showPin, setShowPin] = useState(false)
+  const [error, setError] = useState('')
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!phone.trim()) {
+      setError('Please enter Mobile Number or Shopkeeper ID')
+      return
+    }
+    if (!pin.trim()) {
+      setError('Please enter Security PIN')
+      return
+    }
+    onLogin()
+  }
+
+  const handleDemoLogin = () => {
+    setPhone('+91 98480 12345')
+    setPin('1234')
+    onLogin()
+  }
+
+  return (
+    <div className="min-h-screen w-full bg-slate-950 flex flex-col justify-center items-center p-4 relative overflow-hidden select-none">
+      {/* Background ambient glowing gradients */}
+      <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[550px] h-[550px] bg-blue-600/15 rounded-full blur-3xl pointer-events-none"></div>
+      <div className="absolute -bottom-20 -right-20 w-80 h-80 bg-amber-500/10 rounded-full blur-3xl pointer-events-none"></div>
+
+      <div className="w-full max-w-md relative z-10">
+        {/* Brand Card */}
+        <div className="rounded-3xl bg-slate-900/95 border border-slate-800 p-8 shadow-2xl backdrop-blur-xl">
+          {/* Header Branding */}
+          <div className="text-center mb-6">
+            <div className="inline-flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-500 text-white shadow-lg shadow-blue-500/30 mb-4">
+              <Store className="h-8 w-8" />
+            </div>
+            <div className="inline-block rounded-full bg-amber-400/10 border border-amber-400/20 px-3 py-1 text-[11px] font-bold uppercase tracking-wider text-amber-300 mb-2">
+              Wholesale Depot & Agro-Trading Hub
+            </div>
+            <h1 className="text-2xl font-black tracking-tight text-white">
+              Sri Venkateshwara Trading & Co.
+            </h1>
+            <p className="mt-1 text-xs text-slate-400">
+              Counter POS Estimator & Inventory Management Portal
+            </p>
+          </div>
+
+          {/* Form */}
+          <form onSubmit={handleSubmit} className="space-y-4">
+            {error && (
+              <div className="flex items-center gap-2 rounded-xl bg-rose-500/10 border border-rose-500/20 p-3 text-xs text-rose-400">
+                <AlertCircle className="h-4 w-4 shrink-0" />
+                <span>{error}</span>
+              </div>
+            )}
+
+            <div>
+              <label className="block text-xs font-bold uppercase tracking-wider text-slate-300 mb-1.5">
+                Shopkeeper Mobile / User ID
+              </label>
+              <div className="relative">
+                <User className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                <input
+                  type="text"
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  placeholder="e.g. +91 98480 12345 or admin"
+                  className="w-full rounded-xl bg-slate-800/80 border border-slate-700 pl-10 pr-4 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold uppercase tracking-wider text-slate-300 mb-1.5">
+                Security PIN / Password
+              </label>
+              <div className="relative">
+                <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                <input
+                  type={showPin ? 'text' : 'password'}
+                  value={pin}
+                  onChange={(e) => setPin(e.target.value)}
+                  placeholder="Enter PIN (default: 1234)"
+                  className="w-full rounded-xl bg-slate-800/80 border border-slate-700 pl-10 pr-10 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPin(!showPin)}
+                  className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200"
+                >
+                  {showPin ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
+            </div>
+
+            <div className="pt-2 space-y-2.5">
+              <button
+                type="submit"
+                className="w-full flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 py-3 text-sm font-bold text-white shadow-lg shadow-blue-600/30 hover:from-blue-500 hover:to-indigo-500 active:scale-[0.99] transition-all cursor-pointer"
+              >
+                <span>Sign In to Dashboard</span>
+                <ArrowRight className="h-4 w-4" />
+              </button>
+
+              <button
+                type="button"
+                onClick={handleDemoLogin}
+                className="w-full flex items-center justify-center gap-2 rounded-xl bg-slate-800/90 border border-slate-700 py-2.5 text-xs font-semibold text-slate-300 hover:bg-slate-800 hover:text-white transition-all cursor-pointer"
+              >
+                <Sparkles className="h-3.5 w-3.5 text-amber-400" />
+                <span>Quick Demo Access (1-Click)</span>
+              </button>
+            </div>
+          </form>
+
+          {/* Quick info badges */}
+          <div className="mt-6 pt-6 border-t border-slate-800/80 grid grid-cols-2 gap-2 text-[11px] text-slate-400 text-center">
+            <div className="rounded-lg bg-slate-800/50 p-2">
+              <span className="font-semibold text-emerald-400 block">☁️ Turso Cloud Sync</span>
+              <span>Centralized Pricing</span>
+            </div>
+            <div className="rounded-lg bg-slate-800/50 p-2">
+              <span className="font-semibold text-blue-400 block">📄 Physical Slip Ready</span>
+              <span>Kondalu #2354 Spec</span>
+            </div>
+          </div>
+        </div>
+
+        <div className="text-center mt-4 text-xs text-slate-500">
+          Sri Venkateshwara Trading & Co. • Agro & Hardware Operations
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function App() {
-  const [activePage, setActivePage] = useState<'Estimator' | 'Products' | 'Customers' | 'Dashboard' | 'Customer Types'>('Estimator')
+  // Authentication State
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
+    return localStorage.getItem('sri_trading_auth') === 'true'
+  })
+
+  // Landing page: Default is ALWAYS Dashboard
+  const [activePage, setActivePage] = useState<'Dashboard' | 'Estimator' | 'Products' | 'Customers' | 'Customer Types'>('Dashboard')
+
+  // Stable sequential estimate number (retained across renders)
+  const [currentEstimateNo, setCurrentEstimateNo] = useState<string>(() => {
+    return localStorage.getItem('sri_current_estimate_no') || '2354'
+  })
 
   // Global Data
   const [products, setProducts] = useState<Product[]>([])
@@ -313,6 +476,11 @@ function App() {
     }
   }, [estimateRows])
 
+  // Total Quoted Revenue across all saved estimates
+  const totalQuotedRevenue = useMemo(() => {
+    return quotations.reduce((sum, q) => sum + (Number(q.total) || 0), 0)
+  }, [quotations])
+
   // Load the 26 real items from the user's uploaded slip with 1 click!
   const loadRealReceiptItems = () => {
     if (products.length === 0) return
@@ -356,6 +524,9 @@ function App() {
       '90MM PVC Pipe Nandi': 10.0,
     }
 
+    setCurrentEstimateNo('2354')
+    localStorage.setItem('sri_current_estimate_no', '2354')
+
     const rows: EstimateRow[] = products.map((p) => {
       const qty = receiptQuantities[p.product_name] || 1
       return calculateRow(
@@ -391,6 +562,7 @@ function App() {
     setIsSavingQuote(true)
     try {
       const payload = {
+        quotationNumber: `EST-${currentEstimateNo}`,
         customerId: selectedCustomer.id || null,
         customerName: selectedCustomer.customer_name || 'Guest Walk-In',
         customerPhone: selectedCustomer.phone || '',
@@ -430,6 +602,12 @@ function App() {
           totalAmount: summary.totalAmount,
           items: estimateRows,
         })
+
+        // Advance to next estimate number
+        const nextNum = (parseInt(currentEstimateNo, 10) || 2354) + 1
+        const nextStr = String(nextNum)
+        setCurrentEstimateNo(nextStr)
+        localStorage.setItem('sri_current_estimate_no', nextStr)
       } else {
         alert('Failed to save quotation: ' + data.message)
       }
@@ -565,6 +743,21 @@ function App() {
       p.product_code.toLowerCase().includes(productSearch.toLowerCase())
   )
 
+  const handleLogin = () => {
+    localStorage.setItem('sri_trading_auth', 'true')
+    setIsAuthenticated(true)
+    setActivePage('Dashboard')
+  }
+
+  const handleLogout = () => {
+    localStorage.removeItem('sri_trading_auth')
+    setIsAuthenticated(false)
+  }
+
+  if (!isAuthenticated) {
+    return <LoginScreen onLogin={handleLogin} />
+  }
+
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-[#F8FAFC] text-[#0F172A]">
       {/* ============================================================ */}
@@ -588,20 +781,32 @@ function App() {
             <span className="px-3 text-[11px] font-bold uppercase tracking-wider text-slate-400">Operations</span>
             <nav className="mt-2 flex flex-col gap-1.5">
               <button
+                onClick={() => setActivePage('Dashboard')}
+                className={`flex items-center gap-3 rounded-xl px-3.5 py-2.5 text-sm font-semibold transition-all cursor-pointer ${
+                  activePage === 'Dashboard'
+                    ? 'bg-blue-600 text-white shadow-md shadow-blue-900/40'
+                    : 'text-slate-300 hover:bg-slate-800/60 hover:text-white'
+                }`}
+              >
+                <LayoutDashboard className="h-4 w-4" />
+                <span>Dashboard</span>
+              </button>
+
+              <button
                 onClick={() => setActivePage('Estimator')}
-                className={`flex items-center gap-3 rounded-xl px-3.5 py-2.5 text-sm font-semibold transition-all ${
+                className={`flex items-center gap-3 rounded-xl px-3.5 py-2.5 text-sm font-semibold transition-all cursor-pointer ${
                   activePage === 'Estimator'
                     ? 'bg-blue-600 text-white shadow-md shadow-blue-900/40'
                     : 'text-slate-300 hover:bg-slate-800/60 hover:text-white'
                 }`}
               >
                 <Calculator className="h-4 w-4" />
-                <span>Estimator</span>
+                <span>Estimator (POS)</span>
               </button>
 
               <button
                 onClick={() => setActivePage('Products')}
-                className={`flex items-center gap-3 rounded-xl px-3.5 py-2.5 text-sm font-semibold transition-all ${
+                className={`flex items-center gap-3 rounded-xl px-3.5 py-2.5 text-sm font-semibold transition-all cursor-pointer ${
                   activePage === 'Products'
                     ? 'bg-blue-600 text-white shadow-md shadow-blue-900/40'
                     : 'text-slate-300 hover:bg-slate-800/60 hover:text-white'
@@ -613,7 +818,7 @@ function App() {
 
               <button
                 onClick={() => setActivePage('Customers')}
-                className={`flex items-center gap-3 rounded-xl px-3.5 py-2.5 text-sm font-semibold transition-all ${
+                className={`flex items-center gap-3 rounded-xl px-3.5 py-2.5 text-sm font-semibold transition-all cursor-pointer ${
                   activePage === 'Customers'
                     ? 'bg-blue-600 text-white shadow-md shadow-blue-900/40'
                     : 'text-slate-300 hover:bg-slate-800/60 hover:text-white'
@@ -625,7 +830,7 @@ function App() {
 
               <button
                 onClick={() => setActivePage('Customer Types')}
-                className={`flex items-center gap-3 rounded-xl px-3.5 py-2.5 text-sm font-semibold transition-all ${
+                className={`flex items-center gap-3 rounded-xl px-3.5 py-2.5 text-sm font-semibold transition-all cursor-pointer ${
                   activePage === 'Customer Types'
                     ? 'bg-blue-600 text-white shadow-md shadow-blue-900/40'
                     : 'text-slate-300 hover:bg-slate-800/60 hover:text-white'
@@ -633,18 +838,6 @@ function App() {
               >
                 <Tags className="h-4 w-4" />
                 <span>Customer Types</span>
-              </button>
-
-              <button
-                onClick={() => setActivePage('Dashboard')}
-                className={`flex items-center gap-3 rounded-xl px-3.5 py-2.5 text-sm font-semibold transition-all ${
-                  activePage === 'Dashboard'
-                    ? 'bg-blue-600 text-white shadow-md shadow-blue-900/40'
-                    : 'text-slate-300 hover:bg-slate-800/60 hover:text-white'
-                }`}
-              >
-                <LayoutDashboard className="h-4 w-4" />
-                <span>Dashboard</span>
               </button>
             </nav>
           </div>
@@ -665,14 +858,23 @@ function App() {
             <Database className="h-3.5 w-3.5 text-emerald-400" />
           </div>
 
-          <div className="flex items-center gap-3 px-1">
-            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-600 text-xs font-bold text-white">
-              SK
+          <div className="flex items-center justify-between px-1">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-600 text-xs font-bold text-white shrink-0">
+                SK
+              </div>
+              <div className="flex flex-col min-w-0">
+                <span className="truncate text-xs font-semibold text-white">Shopkeeper</span>
+                <span className="truncate text-[10px] text-slate-400">Single User Admin</span>
+              </div>
             </div>
-            <div className="flex flex-col min-w-0">
-              <span className="truncate text-xs font-semibold text-white">Shopkeeper</span>
-              <span className="truncate text-[10px] text-slate-400">Single User Admin</span>
-            </div>
+            <button
+              onClick={handleLogout}
+              title="Sign Out"
+              className="p-1.5 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-slate-800 transition-colors cursor-pointer"
+            >
+              <LogOut className="h-4 w-4" />
+            </button>
           </div>
         </div>
       </aside>
@@ -690,8 +892,11 @@ function App() {
 
           <div className="flex items-center gap-3">
             <button
-              onClick={loadRealReceiptItems}
-              className="flex items-center gap-2 rounded-xl bg-amber-50 px-3.5 py-1.5 text-xs font-bold text-amber-700 hover:bg-amber-100 transition-colors border border-amber-200"
+              onClick={() => {
+                loadRealReceiptItems()
+                setActivePage('Estimator')
+              }}
+              className="flex items-center gap-2 rounded-xl bg-amber-50 px-3.5 py-1.5 text-xs font-bold text-amber-700 hover:bg-amber-100 transition-colors border border-amber-200 cursor-pointer"
             >
               <FileCheck className="h-3.5 w-3.5" />
               <span>Load 26 Slip Items (#2354)</span>
@@ -725,9 +930,23 @@ function App() {
                   </p>
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className="rounded-xl bg-white border border-slate-200 px-3 py-1.5 text-xs font-bold text-slate-700 shadow-sm">
-                    Est No: #{Math.floor(1000 + Math.random() * 9000)}
+                  <span className="rounded-xl bg-white border border-slate-200 px-3.5 py-1.5 text-xs font-bold text-slate-800 shadow-sm flex items-center gap-1.5">
+                    <Receipt className="h-3.5 w-3.5 text-blue-600" />
+                    <span>Est No: #{currentEstimateNo}</span>
                   </span>
+                  <button
+                    onClick={() => {
+                      const nextNum = (parseInt(currentEstimateNo, 10) || 2354) + 1
+                      const nextStr = String(nextNum)
+                      setCurrentEstimateNo(nextStr)
+                      localStorage.setItem('sri_current_estimate_no', nextStr)
+                      setEstimateRows([])
+                    }}
+                    className="rounded-xl bg-slate-100 hover:bg-slate-200 border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-700 transition-colors cursor-pointer"
+                    title="Start new blank estimate with next sequential number"
+                  >
+                    + New Estimate
+                  </button>
                 </div>
               </div>
 
@@ -1337,51 +1556,160 @@ function App() {
           {/* ============================================================ */}
           {activePage === 'Dashboard' && (
             <div className="space-y-6">
-              <div>
-                <h1 className="text-2xl font-bold tracking-tight text-slate-900">Operations Dashboard</h1>
-                <p className="mt-0.5 text-sm text-slate-500">
-                  Performance overview and recent estimate history for Sri Venkateshwara Trading & Co
-                </p>
+              {/* Header Title */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div>
+                  <h1 className="text-2xl font-bold tracking-tight text-slate-900">Operations Dashboard</h1>
+                  <p className="mt-0.5 text-sm text-slate-500">
+                    Real-time performance overview, pricing control, and walk-in counter operations
+                  </p>
+                </div>
+                <div className="flex items-center gap-2.5">
+                  <button
+                    onClick={() => setActivePage('Estimator')}
+                    className="flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2 text-xs font-bold text-white shadow-sm hover:bg-blue-700 transition-colors cursor-pointer"
+                  >
+                    <Calculator className="h-4 w-4" />
+                    <span>Open Estimator</span>
+                  </button>
+                  <button
+                    onClick={() => setShowNewProductModal(true)}
+                    className="flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors cursor-pointer"
+                  >
+                    <Plus className="h-3.5 w-3.5 text-slate-500" />
+                    <span>Add SKU</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Quick Action Hero Banner */}
+              <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-blue-700 via-blue-800 to-indigo-900 p-6 md:p-8 text-white shadow-lg">
+                <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
+                  <div>
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="rounded-full bg-blue-500/30 px-3 py-0.5 text-xs font-bold uppercase tracking-wider text-blue-200 border border-blue-400/20">
+                        Sri Venkateshwara Trading Portal
+                      </span>
+                      <span className="rounded-full bg-emerald-500/20 px-2.5 py-0.5 text-xs font-semibold text-emerald-300">
+                        Counter Ready
+                      </span>
+                    </div>
+                    <h2 className="text-2xl md:text-3xl font-extrabold tracking-tight">
+                      Ready to generate a new quotation?
+                    </h2>
+                    <p className="mt-1 text-xs md:text-sm text-blue-100 max-w-xl">
+                      Fast walk-in counter calculations with real-time discounts, tiered margins, and instant WhatsApp receipts.
+                    </p>
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-3">
+                    <button
+                      onClick={() => setActivePage('Estimator')}
+                      className="flex items-center gap-2.5 rounded-2xl bg-white px-5 py-3 text-sm font-bold text-blue-900 shadow-md hover:bg-blue-50 transition-all active:scale-95 cursor-pointer"
+                    >
+                      <Calculator className="h-5 w-5 text-blue-600" />
+                      <span>Create New Estimate</span>
+                      <ArrowRight className="h-4 w-4 text-blue-500" />
+                    </button>
+
+                    <button
+                      onClick={() => {
+                        loadRealReceiptItems()
+                        setActivePage('Estimator')
+                      }}
+                      className="flex items-center gap-2 rounded-2xl bg-blue-950/60 border border-blue-400/30 px-4 py-3 text-sm font-bold text-white hover:bg-blue-900/80 transition-all cursor-pointer"
+                    >
+                      <FileCheck className="h-4 w-4 text-amber-300" />
+                      <span>Load Kondalu Slip (#2354)</span>
+                    </button>
+                  </div>
+                </div>
               </div>
 
               {/* Metric Cards */}
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 <div className="rounded-2xl bg-white p-5 shadow-sm border border-slate-200/80">
                   <div className="flex items-center justify-between text-slate-400 mb-2">
+                    <span className="text-xs font-bold uppercase tracking-wider">Total Quoted Value</span>
+                    <TrendingUp className="h-4 w-4 text-emerald-600" />
+                  </div>
+                  <div className="text-2xl font-bold text-slate-900">{formatINR(totalQuotedRevenue)}</div>
+                  <span className="text-xs text-emerald-600 font-semibold">{quotations.length} total receipts generated</span>
+                </div>
+
+                <div className="rounded-2xl bg-white p-5 shadow-sm border border-slate-200/80">
+                  <div className="flex items-center justify-between text-slate-400 mb-2">
                     <span className="text-xs font-bold uppercase tracking-wider">Catalog SKUs</span>
-                    <Package className="h-4 w-4" />
+                    <Package className="h-4 w-4 text-blue-600" />
                   </div>
-                  <div className="text-2xl font-bold text-slate-900">{products.length}</div>
-                  <span className="text-xs text-emerald-600 font-semibold">Real slip inventory loaded</span>
+                  <div className="text-2xl font-bold text-slate-900">{products.length} Items</div>
+                  <span className="text-xs text-blue-600 font-semibold">Real slip inventory loaded</span>
                 </div>
 
                 <div className="rounded-2xl bg-white p-5 shadow-sm border border-slate-200/80">
                   <div className="flex items-center justify-between text-slate-400 mb-2">
-                    <span className="text-xs font-bold uppercase tracking-wider">Active Customers</span>
-                    <Users className="h-4 w-4" />
+                    <span className="text-xs font-bold uppercase tracking-wider">Active Parties</span>
+                    <Users className="h-4 w-4 text-indigo-600" />
                   </div>
-                  <div className="text-2xl font-bold text-slate-900">{customers.length}</div>
-                  <span className="text-xs text-blue-600 font-semibold">Kondalu, Ramesh, Srinivas</span>
-                </div>
-
-                <div className="rounded-2xl bg-white p-5 shadow-sm border border-slate-200/80">
-                  <div className="flex items-center justify-between text-slate-400 mb-2">
-                    <span className="text-xs font-bold uppercase tracking-wider">Estimates Generated</span>
-                    <Calculator className="h-4 w-4" />
-                  </div>
-                  <div className="text-2xl font-bold text-slate-900">{quotations.length}</div>
-                  <span className="text-xs text-slate-400">Archived in DB</span>
+                  <div className="text-2xl font-bold text-slate-900">{customers.length} Accounts</div>
+                  <span className="text-xs text-indigo-600 font-semibold">Tiered discount profiles</span>
                 </div>
 
                 <div className="rounded-2xl bg-white p-5 shadow-sm border border-slate-200/80">
                   <div className="flex items-center justify-between text-slate-400 mb-2">
                     <span className="text-xs font-bold uppercase tracking-wider">Database Mode</span>
-                    <Database className="h-4 w-4" />
+                    <Database className="h-4 w-4 text-slate-500" />
                   </div>
-                  <div className="text-base font-bold text-slate-900">
-                    {dbStatus.isUsingTurso ? 'Turso Cloud' : 'Local SQLite'}
+                  <div className="text-base font-bold text-slate-900 flex items-center gap-2">
+                    <span className="h-2.5 w-2.5 rounded-full bg-emerald-500 inline-block animate-pulse"></span>
+                    <span>{dbStatus.isUsingTurso ? 'Turso Cloud' : 'Local SQLite'}</span>
                   </div>
                   <span className="text-xs text-emerald-600 font-semibold">100% Offline Ready</span>
+                </div>
+              </div>
+
+              {/* Fast Module Shortcut Cards */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div 
+                  onClick={() => setActivePage('Estimator')}
+                  className="group cursor-pointer rounded-2xl bg-white p-5 shadow-sm border border-slate-200/80 hover:border-blue-500 hover:shadow-md transition-all"
+                >
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-50 text-blue-600 group-hover:bg-blue-600 group-hover:text-white transition-colors">
+                      <Calculator className="h-5 w-5" />
+                    </div>
+                    <ArrowRight className="h-4 w-4 text-slate-400 group-hover:text-blue-600 group-hover:translate-x-1 transition-all" />
+                  </div>
+                  <h4 className="font-bold text-slate-900 text-sm">Quote Estimator (POS)</h4>
+                  <p className="text-xs text-slate-500 mt-1">Calculate slip items with unit discounts and markup</p>
+                </div>
+
+                <div 
+                  onClick={() => setActivePage('Products')}
+                  className="group cursor-pointer rounded-2xl bg-white p-5 shadow-sm border border-slate-200/80 hover:border-blue-500 hover:shadow-md transition-all"
+                >
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-50 text-amber-600 group-hover:bg-amber-600 group-hover:text-white transition-colors">
+                      <Package className="h-5 w-5" />
+                    </div>
+                    <ArrowRight className="h-4 w-4 text-slate-400 group-hover:text-amber-600 group-hover:translate-x-1 transition-all" />
+                  </div>
+                  <h4 className="font-bold text-slate-900 text-sm">Inventory & Wholesale Catalog</h4>
+                  <p className="text-xs text-slate-500 mt-1">View list prices, trade discounts, and stock levels</p>
+                </div>
+
+                <div 
+                  onClick={() => setActivePage('Customers')}
+                  className="group cursor-pointer rounded-2xl bg-white p-5 shadow-sm border border-slate-200/80 hover:border-blue-500 hover:shadow-md transition-all"
+                >
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600 group-hover:bg-emerald-600 group-hover:text-white transition-colors">
+                      <Users className="h-5 w-5" />
+                    </div>
+                    <ArrowRight className="h-4 w-4 text-slate-400 group-hover:text-emerald-600 group-hover:translate-x-1 transition-all" />
+                  </div>
+                  <h4 className="font-bold text-slate-900 text-sm">Party Directory & Tiers</h4>
+                  <p className="text-xs text-slate-500 mt-1">Manage regular retail, sub-dealers, and contractors</p>
                 </div>
               </div>
 
