@@ -516,16 +516,12 @@ app.get(["/api/quotations/:id", "/quotations/:id"], async (req, res) => {
     res.status(500).json({ success: false, message: "Failed to fetch quotation details" });
   }
 });
-var PORT = process.env.PORT || 3e3;
-if (!process.env.VERCEL) {
-  app.listen(PORT, () => {
-    console.log(`[QuoteFlow] Sri Venkateshwara Trading Backend running on http://localhost:${PORT}`);
-  });
+export default function handler(req, res) {
+  return app(req, res);
 }
-var index_default = app;
+
 export {
   db,
-  index_default as default,
   initSchema,
   isUsingTurso
 };
