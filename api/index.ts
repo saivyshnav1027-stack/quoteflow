@@ -1,9 +1,9 @@
 import express from 'express'
 import cors from 'cors'
-import { createClient } from '@libsql/client'
+import { createClient } from '@libsql/client/web'
 
 // =====================================================
-// DATABASE SETUP (DUAL MODE: TURSO CLOUD + LOCAL SQLITE)
+// DATABASE SETUP (TURSO CLOUD - PURE JS/FETCH FOR SERVERLESS)
 // =====================================================
 const DEFAULT_TURSO_URL = 'libsql://quoteflow-db-saivyshnav1027-stack.aws-ap-south-1.turso.io'
 const DEFAULT_TURSO_TOKEN = 'eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJhIjoicnciLCJpYXQiOjE3OTA0NDg3MjQsImlkIjoiMDFhMGRmMGMtYmQwMS03OWQ1LTkyYTUtMjE2MDdhN2U1N2M5Iiwia2lkIjoiR2swVEt2LUphQmVGMkxaVHFSV3RDYUltOFE4YnIweHBFVFlDUzJzMXFaayIsInJpZCI6IjUzYTAyNmI5LWQxNmEtNDc2Yi1hYzg3LWFiOTVhMWY1YzNmNCJ9.B44Vmgfr2EWmCJu-h3xorAv7wePo5Sq97Rdhmr0FdYYYSiy2Wrur1kEEW-ALINqb-f_7QnhfOgOTxUNBSY8bBA'
@@ -11,20 +11,12 @@ const DEFAULT_TURSO_TOKEN = 'eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJhIjoicnciLC
 const tursoUrl = (process.env.TURSO_DATABASE_URL || DEFAULT_TURSO_URL)?.trim()
 const tursoToken = (process.env.TURSO_AUTH_TOKEN || DEFAULT_TURSO_TOKEN)?.trim()
 
-const isTurso = Boolean(tursoUrl && (tursoUrl.startsWith('libsql://') || tursoUrl.startsWith('https://')))
+export const db = createClient({
+  url: tursoUrl,
+  authToken: tursoToken,
+})
 
-export const db = createClient(
-  isTurso
-    ? {
-        url: tursoUrl,
-        authToken: tursoToken,
-      }
-    : {
-        url: 'file:local.db',
-      }
-)
-
-export const isUsingTurso = isTurso
+export const isUsingTurso = true
 
 // =====================================================
 // SCHEMA INITIALIZATION
@@ -112,6 +104,15 @@ app.use(express.json())
 
 // Boot check
 initSchema().catch((err) => console.error('[DB Boot Init Error]', err))
+
+// Root / health
+app.get(['/api', '/'], (_req, res) => {
+  res.json({
+    success: true,
+    message: 'Sri Venkateshwara Trading QuoteFlow API online',
+    isUsingTurso: true,
+  })
+})
 
 // 1. HEALTH / DATABASE STATUS
 app.get(['/api/test-db', '/test-db'], async (_req, res) => {
