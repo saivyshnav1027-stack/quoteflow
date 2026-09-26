@@ -324,6 +324,7 @@ function App() {
   const [estimateRows, setEstimateRows] = useState<EstimateRow[]>([])
   const [isSavingQuote, setIsSavingQuote] = useState(false)
   const [saveSuccessMsg, setSaveSuccessMsg] = useState('')
+  const [whatsappSharedNotice, setWhatsappSharedNotice] = useState(false)
 
   // Print Slip Modal State
   const [showPrintModal, setShowPrintModal] = useState(false)
@@ -695,6 +696,26 @@ function App() {
 
     const url = `https://wa.me/${phone}?text=${encodeURIComponent(msg)}`
     window.open(url, '_blank')
+    setWhatsappSharedNotice(true)
+  }
+
+  // Clear Current Estimate & Advance Sequence
+  const clearCurrentEstimate = () => {
+    if (estimateRows.length === 0) return
+    if (window.confirm('Clear all items and start a fresh estimate for the next customer?')) {
+      clearCurrentEstimateDirect()
+    }
+  }
+
+  const clearCurrentEstimateDirect = () => {
+    setEstimateRows([])
+    setProductSearch('')
+    setShowProductDropdown(false)
+    setWhatsappSharedNotice(false)
+    const nextNum = (parseInt(currentEstimateNo, 10) || 2354) + 1
+    const nextStr = String(nextNum)
+    setCurrentEstimateNo(nextStr)
+    localStorage.setItem('sri_current_estimate_no', nextStr)
   }
 
   // Open Print Modal for Current Active Estimate
@@ -1007,17 +1028,12 @@ function App() {
                     <span>Est No: #{currentEstimateNo}</span>
                   </span>
                   <button
-                    onClick={() => {
-                      const nextNum = (parseInt(currentEstimateNo, 10) || 2354) + 1
-                      const nextStr = String(nextNum)
-                      setCurrentEstimateNo(nextStr)
-                      localStorage.setItem('sri_current_estimate_no', nextStr)
-                      setEstimateRows([])
-                    }}
-                    className="rounded-xl bg-slate-100 hover:bg-slate-200 border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-700 transition-colors cursor-pointer"
+                    onClick={clearCurrentEstimate}
+                    className="flex items-center gap-1.5 rounded-xl bg-blue-50 hover:bg-blue-100 border border-blue-200 px-3.5 py-1.5 text-xs font-bold text-blue-700 transition-colors cursor-pointer shadow-sm"
                     title="Start new blank estimate with next sequential number"
                   >
-                    + New Estimate
+                    <Plus className="h-3.5 w-3.5" />
+                    <span>+ New Estimate</span>
                   </button>
                 </div>
               </div>
@@ -1343,6 +1359,37 @@ function App() {
                   </table>
                 </div>
 
+                {/* Post-WhatsApp Share Notice Banner */}
+                {whatsappSharedNotice && (
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-2xl bg-emerald-50 border border-emerald-200 p-4 shadow-sm">
+                    <div className="flex items-center gap-3">
+                      <div className="h-9 w-9 rounded-xl bg-emerald-600 flex items-center justify-center text-white shrink-0 shadow-sm">
+                        <CheckCircle2 className="h-5 w-5" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-bold text-emerald-900">Estimate Shared via WhatsApp!</p>
+                        <p className="text-xs text-emerald-700">Estimate was prepared for <b>{selectedCustomer.customer_name}</b>. Ready to start fresh for the next customer?</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <button
+                        onClick={clearCurrentEstimateDirect}
+                        className="flex items-center gap-1.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 px-4 py-2 text-xs font-bold text-white shadow-sm transition-colors cursor-pointer"
+                      >
+                        <RotateCcw className="h-3.5 w-3.5" />
+                        <span>Clear & Start Next Estimate</span>
+                      </button>
+                      <button
+                        onClick={() => setWhatsappSharedNotice(false)}
+                        className="rounded-xl border border-emerald-200 bg-white p-2 text-slate-500 hover:bg-emerald-100 transition-colors cursor-pointer"
+                        title="Dismiss notice"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    </div>
+                  </div>
+                )}
+
                 {/* Section C: Summary & Action Buttons */}
                 <div className="flex flex-col lg:flex-row items-center justify-between gap-6 pt-2">
                   <div className="flex flex-wrap items-center gap-4 text-xs text-slate-500">
@@ -1373,11 +1420,13 @@ function App() {
                     {/* Action Buttons */}
                     <div className="flex flex-wrap items-center gap-2">
                       <button
-                        onClick={() => setEstimateRows([])}
-                        className="rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-xs font-bold text-slate-600 hover:bg-slate-50 transition-colors"
-                        title="Clear estimate"
+                        onClick={clearCurrentEstimate}
+                        disabled={estimateRows.length === 0}
+                        className="flex items-center gap-2 rounded-xl border border-rose-200 bg-rose-50 px-4 py-2.5 text-xs font-bold text-rose-700 hover:bg-rose-100 transition-colors shadow-sm disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+                        title="Clear all items and start next estimate"
                       >
-                        <RotateCcw className="h-4 w-4" />
+                        <Trash2 className="h-4 w-4 text-rose-600" />
+                        <span>Clear Estimate</span>
                       </button>
 
                       <button
