@@ -14,7 +14,7 @@ initSchema().catch((err) => console.error('[DB Boot Init Error]', err))
 // =====================================================
 // 1. HEALTH / DATABASE STATUS
 // =====================================================
-app.get('/api/test-db', async (_req, res) => {
+app.get(['/api/test-db', '/test-db'], async (_req, res) => {
   try {
     const result = await db.execute('SELECT 1 AS connected')
     res.json({
@@ -38,7 +38,7 @@ app.get('/api/test-db', async (_req, res) => {
 // =====================================================
 // 2. CUSTOMER TYPES (TIERS)
 // =====================================================
-app.get('/api/customer-types', async (_req, res) => {
+app.get(['/api/customer-types', '/customer-types'], async (_req, res) => {
   try {
     const result = await db.execute(`
       SELECT id, type_name, markup_percentage
@@ -52,7 +52,7 @@ app.get('/api/customer-types', async (_req, res) => {
   }
 })
 
-app.put('/api/customer-types/:id', async (req, res) => {
+app.put(['/api/customer-types/:id', '/customer-types/:id'], async (req, res) => {
   try {
     const id = Number(req.params.id)
     const markup = Number(req.body.markup)
@@ -85,7 +85,7 @@ app.put('/api/customer-types/:id', async (req, res) => {
 // =====================================================
 // 3. CUSTOMERS
 // =====================================================
-app.get('/api/customers', async (_req, res) => {
+app.get(['/api/customers', '/customers'], async (_req, res) => {
   try {
     const result = await db.execute(`
       SELECT
@@ -106,7 +106,7 @@ app.get('/api/customers', async (_req, res) => {
   }
 })
 
-app.post('/api/customers', async (req, res) => {
+app.post(['/api/customers', '/customers'], async (req, res) => {
   try {
     const customerName = String(req.body.customerName ?? '').trim()
     const phone = String(req.body.phone ?? '').trim()
@@ -143,7 +143,7 @@ app.post('/api/customers', async (req, res) => {
   }
 })
 
-app.put('/api/customers/:id', async (req, res) => {
+app.put(['/api/customers/:id', '/customers/:id'], async (req, res) => {
   try {
     const id = Number(req.params.id)
     const customerName = String(req.body.customerName ?? '').trim()
@@ -173,7 +173,7 @@ app.put('/api/customers/:id', async (req, res) => {
 // =====================================================
 // 4. PRODUCTS (INVENTORY)
 // =====================================================
-app.get('/api/products', async (_req, res) => {
+app.get(['/api/products', '/products'], async (_req, res) => {
   try {
     const result = await db.execute(`
       SELECT
@@ -196,7 +196,7 @@ app.get('/api/products', async (_req, res) => {
   }
 })
 
-app.post('/api/products', async (req, res) => {
+app.post(['/api/products', '/products'], async (req, res) => {
   try {
     let productCode = String(req.body.productCode ?? '').trim()
     const productName = String(req.body.productName ?? '').trim()
@@ -210,26 +210,22 @@ app.post('/api/products', async (req, res) => {
       return res.status(400).json({ success: false, message: 'Product name is required' })
     }
 
-    // Auto-generate code if empty
     if (!productCode) {
       const countRes = await db.execute('SELECT COUNT(*) as count FROM products')
       const nextNum = Number(countRes.rows[0].count) + 1
       productCode = `SKU-${String(nextNum).padStart(4, '0')}`
     }
 
-    // Default cost price calculation if 0
     if (costPrice <= 0 && listPrice > 0) {
       costPrice = Number((listPrice * (1 - discountPercentage / 100)).toFixed(2))
     }
 
-    // Check unique code
     const existing = await db.execute({
       sql: `SELECT id FROM products WHERE product_code = ?`,
       args: [productCode],
     })
 
     if (existing.rows.length > 0) {
-      // Append random suffix
       productCode = `${productCode}-${Math.floor(100 + Math.random() * 900)}`
     }
 
@@ -258,7 +254,7 @@ app.post('/api/products', async (req, res) => {
   }
 })
 
-app.put('/api/products/:id', async (req, res) => {
+app.put(['/api/products/:id', '/products/:id'], async (req, res) => {
   try {
     const id = Number(req.params.id)
     const productCode = String(req.body.productCode ?? '').trim()
@@ -293,7 +289,7 @@ app.put('/api/products/:id', async (req, res) => {
   }
 })
 
-app.delete('/api/products/:id', async (req, res) => {
+app.delete(['/api/products/:id', '/products/:id'], async (req, res) => {
   try {
     const id = Number(req.params.id)
     if (!Number.isInteger(id)) {
@@ -326,7 +322,7 @@ type EstimateItemInput = {
   lineTotal: number
 }
 
-app.post('/api/quotations', async (req, res) => {
+app.post(['/api/quotations', '/quotations'], async (req, res) => {
   try {
     const customerId = req.body.customerId ? Number(req.body.customerId) : null
     const customerName = String(req.body.customerName || 'Guest Walk-In')
@@ -352,7 +348,6 @@ app.post('/api/quotations', async (req, res) => {
         netPrice = listPrice > 0 ? Number((listPrice * (1 - dis / 100)).toFixed(2)) : 0
       }
 
-      // Add tier markup if applicable
       if (markupPercentage > 0) {
         netPrice = Number((netPrice * (1 + markupPercentage / 100)).toFixed(2))
       }
@@ -377,14 +372,12 @@ app.post('/api/quotations', async (req, res) => {
     const total = Number(subtotal.toFixed(2))
     totalUnits = Number(totalUnits.toFixed(2))
 
-    // Generate Quotation Number
     const now = new Date()
     const dateStr = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}`
     const countRes = await db.execute('SELECT COUNT(*) as count FROM quotations')
     const nextCount = Number(countRes.rows[0].count) + 1
     const quotationNumber = `EST-${dateStr}-${String(nextCount).padStart(3, '0')}`
 
-    // Insert master quotation
     const quoteResult = await db.execute({
       sql: `
         INSERT INTO quotations 
@@ -396,7 +389,6 @@ app.post('/api/quotations', async (req, res) => {
 
     const quotationId = Number(quoteResult.lastInsertRowid)
 
-    // Insert line items
     for (const item of processedItems) {
       await db.execute({
         sql: `
@@ -442,7 +434,7 @@ app.post('/api/quotations', async (req, res) => {
   }
 })
 
-app.get('/api/quotations', async (_req, res) => {
+app.get(['/api/quotations', '/quotations'], async (_req, res) => {
   try {
     const result = await db.execute(`
       SELECT
@@ -469,7 +461,7 @@ app.get('/api/quotations', async (_req, res) => {
   }
 })
 
-app.get('/api/quotations/:id', async (req, res) => {
+app.get(['/api/quotations/:id', '/quotations/:id'], async (req, res) => {
   try {
     const id = Number(req.params.id)
     if (!Number.isInteger(id)) {
