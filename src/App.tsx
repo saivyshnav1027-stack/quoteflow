@@ -704,7 +704,7 @@ function App() {
       return
     }
     setPrintQuoteData({
-      invoiceNo: '2354',
+      invoiceNo: currentEstimateNo,
       partyName: selectedCustomer.customer_name,
       phone: selectedCustomer.phone,
       dated: new Date().toLocaleDateString('en-GB') + ' (' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) + ')',
@@ -713,6 +713,30 @@ function App() {
       items: estimateRows,
     })
     setShowPrintModal(true)
+  }
+
+  // Share whatever estimate is loaded in Print Modal via WhatsApp
+  const sharePrintSlipViaWhatsApp = () => {
+    if (!printQuoteData) return
+    const phone = printQuoteData.phone ? printQuoteData.phone.replace(/[^0-9]/g, '') : ''
+    let msg = `🌾 *Sri Venkateshwara Trading & Co - ESTIMATION*\n`
+    msg += `Estimate No: ${printQuoteData.invoiceNo}\n`
+    msg += `Party Details: ${printQuoteData.partyName}\n`
+    msg += `Date: ${printQuoteData.dated}\n`
+    msg += `---------------------------------\n`
+
+    printQuoteData.items.forEach((r, idx) => {
+      msg += `${idx + 1}. ${r.description} (${r.quantity} ${r.unit}) - ₹${r.lineTotal.toFixed(2)}\n`
+    })
+
+    msg += `---------------------------------\n`
+    msg += `*Totals c/o:* ${printQuoteData.totalUnits} Units\n`
+    msg += `*Total Estimate:* ₹${printQuoteData.totalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}\n`
+    msg += `---------------------------------\n`
+    msg += `Thank you for your business!`
+
+    const url = `https://wa.me/${phone}?text=${encodeURIComponent(msg)}`
+    window.open(url, '_blank')
   }
 
   // Quick Customer Creation
@@ -1855,6 +1879,13 @@ function App() {
             <div className="no-print flex items-center justify-between pb-4 border-b border-slate-200 mb-6">
               <span className="font-bold text-slate-800 text-sm">Official Estimate Slip Preview</span>
               <div className="flex items-center gap-2">
+                <button
+                  onClick={sharePrintSlipViaWhatsApp}
+                  className="flex items-center gap-1.5 rounded-xl bg-emerald-600 px-4 py-2 text-xs font-bold text-white hover:bg-emerald-700 shadow-sm"
+                >
+                  <Share2 className="h-4 w-4" />
+                  <span>Share WhatsApp</span>
+                </button>
                 <button
                   onClick={() => window.print()}
                   className="flex items-center gap-1.5 rounded-xl bg-blue-600 px-4 py-2 text-xs font-bold text-white hover:bg-blue-700 shadow-sm"
