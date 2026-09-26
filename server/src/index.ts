@@ -1,7 +1,7 @@
 import express from 'express'
 import cors from 'cors'
-import { db, isUsingTurso } from './db'
-import { initSchema } from './schema'
+import { db, isUsingTurso } from './db.js'
+import { initSchema } from './schema.js'
 
 const app = express()
 
@@ -537,8 +537,10 @@ app.get('/api/quotations/:id', async (req, res) => {
 // =====================================================
 const PORT = process.env.PORT || 3000
 
-app.listen(PORT, () => {
-  console.log(`[QuoteFlow] Sri Venkateshwara Trading Backend running on http://localhost:${PORT}`)
-})
+if (!process.env.VERCEL) {
+  app.listen(PORT, () => {
+    console.log(`[QuoteFlow] Sri Venkateshwara Trading Backend running on http://localhost:${PORT}`)
+  })
+}
 
 export default app

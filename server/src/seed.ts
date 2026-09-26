@@ -1,5 +1,5 @@
-import { db } from './db'
-import { initSchema } from './schema'
+import { db } from './db.js'
+import { initSchema } from './schema.js'
 
 async function seed() {
   await initSchema()

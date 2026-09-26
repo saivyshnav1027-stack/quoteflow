@@ -1,4 +1,4 @@
-import { db, isUsingTurso } from './db'
+import { db, isUsingTurso } from './db.js'
 
 export async function initSchema() {
   console.log(`[Database] Initializing schema (${isUsingTurso ? 'Turso Cloud' : 'Local SQLite'})...`)
