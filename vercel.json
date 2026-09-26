@@ -1,9 +1,7 @@
 {
-  "version": 2,
   "rewrites": [
-    {
-      "source": "/api/(.*)",
-      "destination": "/api"
-    }
+    { "source": "/api/products/:id", "destination": "/api/products?id=:id" },
+    { "source": "/api/customer-types/:id", "destination": "/api/customer-types?id=:id" },
+    { "source": "/api/quotations/:id", "destination": "/api/quotations?id=:id" }
   ]
 }
