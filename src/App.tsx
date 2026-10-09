@@ -4,7 +4,6 @@ import {
   Package,
   Users,
   LayoutDashboard,
-  Tags,
   Plus,
   Trash2,
   Printer,
@@ -17,7 +16,6 @@ import {
   RotateCcw,
   Database,
   Check,
-  Percent,
   Receipt,
   LogOut,
   Lock,
@@ -27,6 +25,7 @@ import {
   EyeOff,
   Sparkles,
   AlertCircle,
+  SlidersHorizontal,
 } from 'lucide-react'
 
 const API_BASE = '/api'
@@ -34,11 +33,6 @@ const API_BASE = '/api'
 // ============================================================
 // TYPES
 // ============================================================
-type CustomerType = {
-  id: number
-  type_name: string
-  markup_percentage: number
-}
 
 type Customer = {
   id: number
@@ -57,6 +51,7 @@ type Product = {
   list_price: number
   discount_percentage: number
   cost_price: number
+  margin_percentage: number
   stock_quantity: number
 }
 
@@ -70,7 +65,11 @@ type EstimateRow = {
   unit: string
   listPrice: number
   discountPercentage: number
-  price: number
+  costPrice: number
+  marginPercentage: number
+  discount: number
+  discountType: 'PERCENT' | 'RUPEE'
+  price: number // Net Price per unit
   lineTotal: number
 }
 
@@ -99,32 +98,32 @@ const formatINR = (val: number) => {
 
 // Real 26 Products from Sri Venkateshwara Trading invoice
 const INITIAL_PRODUCTS: Product[] = [
-  { id: 1, product_code: 'LD-320', product_name: 'LD 3*20 (28 de)', unit: 'Kgs.', list_price: 64.0, discount_percentage: 0.0, cost_price: 58.0, stock_quantity: 100 },
-  { id: 2, product_code: 'NANDI-YEL', product_name: 'Yellow Tubing Nandi Flex', unit: 'Kgs.', list_price: 130.0, discount_percentage: 0.0, cost_price: 115.0, stock_quantity: 100 },
-  { id: 3, product_code: 'LD-315', product_name: 'LD 3*15 (5b de)', unit: 'Kgs.', list_price: 64.0, discount_percentage: 0.0, cost_price: 58.0, stock_quantity: 100 },
-  { id: 4, product_code: 'LD-415', product_name: 'LD 4*15 (5b u)', unit: 'Kgs.', list_price: 64.0, discount_percentage: 0.0, cost_price: 58.0, stock_quantity: 100 },
-  { id: 5, product_code: 'LD-420', product_name: 'LD 4*20 (6b de)', unit: 'Kgs.', list_price: 64.0, discount_percentage: 0.0, cost_price: 58.0, stock_quantity: 100 },
-  { id: 6, product_code: 'WC-09', product_name: '9" Waste Coupling', unit: 'Pcs.', list_price: 120.0, discount_percentage: 0.0, cost_price: 95.0, stock_quantity: 100 },
-  { id: 7, product_code: 'WC-06', product_name: '6" Waste Coupling', unit: 'Pcs.', list_price: 95.0, discount_percentage: 0.0, cost_price: 75.0, stock_quantity: 100 },
-  { id: 8, product_code: 'NC-75', product_name: '75mm Necko Clamps', unit: 'Pcs.', list_price: 29.0, discount_percentage: 0.0, cost_price: 22.0, stock_quantity: 100 },
-  { id: 9, product_code: 'NC-110', product_name: '110MM NECKOCLAMPS', unit: 'Pcs.', list_price: 31.0, discount_percentage: 0.0, cost_price: 24.0, stock_quantity: 100 },
-  { id: 10, product_code: 'NPVC-ELB-63', product_name: 'Nandi 63MM Pvc Elbow (H)', unit: 'Pcs.', list_price: 41.6, discount_percentage: 28.0, cost_price: 25.0, stock_quantity: 100 },
-  { id: 11, product_code: 'NPVC-TEE-63', product_name: 'Nandi 63MM Pvc Tee (H)', unit: 'Pcs.', list_price: 51.23, discount_percentage: 28.0, cost_price: 30.0, stock_quantity: 100 },
-  { id: 12, product_code: 'ASH-CPVC-075', product_name: 'Ashirwad 3/4" CPVC PIPE SDR 13.5', unit: 'Pcs.', list_price: 462.0, discount_percentage: 54.0, cost_price: 175.0, stock_quantity: 100 },
-  { id: 13, product_code: 'ASH-CPVC-100', product_name: 'Ashirwad 1" CPVC PIPE SDR 13.5', unit: 'Pcs.', list_price: 663.0, discount_percentage: 54.0, cost_price: 250.0, stock_quantity: 100 },
-  { id: 14, product_code: 'ASH-CPVC-1S11', product_name: 'Ashirwad Cpvc 1" Pipe SDR11', unit: 'Pcs.', list_price: 771.0, discount_percentage: 54.0, cost_price: 290.0, stock_quantity: 100 },
-  { id: 15, product_code: 'WC-HARP', product_name: 'WC Harpan', unit: 'Pcs.', list_price: 340.0, discount_percentage: 0.0, cost_price: 280.0, stock_quantity: 100 },
-  { id: 16, product_code: 'SINK-1822', product_name: '18*22 Steel Sink', unit: 'Pcs.', list_price: 950.0, discount_percentage: 0.0, cost_price: 780.0, stock_quantity: 100 },
-  { id: 17, product_code: 'CHAM-1212', product_name: '12*12 Beed Chamber', unit: 'Pcs.', list_price: 280.0, discount_percentage: 0.0, cost_price: 220.0, stock_quantity: 100 },
-  { id: 18, product_code: 'FRP-2424', product_name: '24*24 FRP Chamber', unit: 'Pcs.', list_price: 1250.0, discount_percentage: 0.0, cost_price: 980.0, stock_quantity: 100 },
-  { id: 19, product_code: 'ASH-SWR-B75', product_name: 'Ashirwad SWR 75mm Plain Bend', unit: 'Pcs.', list_price: 101.0, discount_percentage: 48.0, cost_price: 42.0, stock_quantity: 100 },
-  { id: 20, product_code: 'ASH-SWR-T75', product_name: 'Ashirwad SWR 75MM Nani Trap', unit: 'Pcs.', list_price: 144.0, discount_percentage: 48.0, cost_price: 60.0, stock_quantity: 100 },
-  { id: 21, product_code: 'ASH-SWR-P75', product_name: 'Ashirwad 75MM SWR Pipe', unit: 'Pcs.', list_price: 542.0, discount_percentage: 48.0, cost_price: 225.0, stock_quantity: 100 },
-  { id: 22, product_code: 'ASH-SWR-P110', product_name: 'Ashirwad 110MM SWR Pipe', unit: 'Pcs.', list_price: 942.0, discount_percentage: 48.0, cost_price: 390.0, stock_quantity: 100 },
-  { id: 23, product_code: 'NANDI-SWR-75', product_name: 'Nandi 75MM Swr Pipe', unit: 'Pcs.', list_price: 195.0, discount_percentage: 0.0, cost_price: 155.0, stock_quantity: 100 },
-  { id: 24, product_code: 'NANDI-SWR-110', product_name: 'Nandi 110MM Swr Pipe', unit: 'Pcs.', list_price: 340.0, discount_percentage: 0.0, cost_price: 275.0, stock_quantity: 100 },
-  { id: 25, product_code: 'NPVC-110', product_name: '110MM PVC Pipe Nandi', unit: 'Pcs.', list_price: 900.0, discount_percentage: 0.0, cost_price: 720.0, stock_quantity: 100 },
-  { id: 26, product_code: 'NPVC-90', product_name: '90MM PVC Pipe Nandi', unit: 'Pcs.', list_price: 630.0, discount_percentage: 0.0, cost_price: 505.0, stock_quantity: 100 },
+  { id: 1, product_code: 'LD-320', product_name: 'LD 3*20 (28 de)', unit: 'Kgs.', list_price: 64.0, discount_percentage: 0.0, cost_price: 58.0, margin_percentage: 15.0, stock_quantity: 100 },
+  { id: 2, product_code: 'NANDI-YEL', product_name: 'Yellow Tubing Nandi Flex', unit: 'Kgs.', list_price: 130.0, discount_percentage: 0.0, cost_price: 115.0, margin_percentage: 15.0, stock_quantity: 100 },
+  { id: 3, product_code: 'LD-315', product_name: 'LD 3*15 (5b de)', unit: 'Kgs.', list_price: 64.0, discount_percentage: 0.0, cost_price: 58.0, margin_percentage: 15.0, stock_quantity: 100 },
+  { id: 4, product_code: 'LD-415', product_name: 'LD 4*15 (5b u)', unit: 'Kgs.', list_price: 64.0, discount_percentage: 0.0, cost_price: 58.0, margin_percentage: 15.0, stock_quantity: 100 },
+  { id: 5, product_code: 'LD-420', product_name: 'LD 4*20 (6b de)', unit: 'Kgs.', list_price: 64.0, discount_percentage: 0.0, cost_price: 58.0, margin_percentage: 15.0, stock_quantity: 100 },
+  { id: 6, product_code: 'WC-09', product_name: '9" Waste Coupling', unit: 'Pcs.', list_price: 120.0, discount_percentage: 0.0, cost_price: 95.0, margin_percentage: 15.0, stock_quantity: 100 },
+  { id: 7, product_code: 'WC-06', product_name: '6" Waste Coupling', unit: 'Pcs.', list_price: 95.0, discount_percentage: 0.0, cost_price: 75.0, margin_percentage: 15.0, stock_quantity: 100 },
+  { id: 8, product_code: 'NC-75', product_name: '75mm Necko Clamps', unit: 'Pcs.', list_price: 29.0, discount_percentage: 0.0, cost_price: 22.0, margin_percentage: 15.0, stock_quantity: 100 },
+  { id: 9, product_code: 'NC-110', product_name: '110MM NECKOCLAMPS', unit: 'Pcs.', list_price: 31.0, discount_percentage: 0.0, cost_price: 24.0, margin_percentage: 15.0, stock_quantity: 100 },
+  { id: 10, product_code: 'NPVC-ELB-63', product_name: 'Nandi 63MM Pvc Elbow (H)', unit: 'Pcs.', list_price: 41.6, discount_percentage: 28.0, cost_price: 25.0, margin_percentage: 15.0, stock_quantity: 100 },
+  { id: 11, product_code: 'NPVC-TEE-63', product_name: 'Nandi 63MM Pvc Tee (H)', unit: 'Pcs.', list_price: 51.23, discount_percentage: 28.0, cost_price: 30.0, margin_percentage: 15.0, stock_quantity: 100 },
+  { id: 12, product_code: 'ASH-CPVC-075', product_name: 'Ashirwad 3/4" CPVC PIPE SDR 13.5', unit: 'Pcs.', list_price: 462.0, discount_percentage: 54.0, cost_price: 175.0, margin_percentage: 15.0, stock_quantity: 100 },
+  { id: 13, product_code: 'ASH-CPVC-100', product_name: 'Ashirwad 1" CPVC PIPE SDR 13.5', unit: 'Pcs.', list_price: 663.0, discount_percentage: 54.0, cost_price: 250.0, margin_percentage: 15.0, stock_quantity: 100 },
+  { id: 14, product_code: 'ASH-CPVC-1S11', product_name: 'Ashirwad Cpvc 1" Pipe SDR11', unit: 'Pcs.', list_price: 771.0, discount_percentage: 54.0, cost_price: 290.0, margin_percentage: 15.0, stock_quantity: 100 },
+  { id: 15, product_code: 'WC-HARP', product_name: 'WC Harpan', unit: 'Pcs.', list_price: 340.0, discount_percentage: 0.0, cost_price: 280.0, margin_percentage: 15.0, stock_quantity: 100 },
+  { id: 16, product_code: 'SINK-1822', product_name: '18*22 Steel Sink', unit: 'Pcs.', list_price: 950.0, discount_percentage: 0.0, cost_price: 780.0, margin_percentage: 15.0, stock_quantity: 100 },
+  { id: 17, product_code: 'CHAM-1212', product_name: '12*12 Beed Chamber', unit: 'Pcs.', list_price: 280.0, discount_percentage: 0.0, cost_price: 220.0, margin_percentage: 15.0, stock_quantity: 100 },
+  { id: 18, product_code: 'FRP-2424', product_name: '24*24 FRP Chamber', unit: 'Pcs.', list_price: 1250.0, discount_percentage: 0.0, cost_price: 980.0, margin_percentage: 15.0, stock_quantity: 100 },
+  { id: 19, product_code: 'ASH-SWR-B75', product_name: 'Ashirwad SWR 75mm Plain Bend', unit: 'Pcs.', list_price: 101.0, discount_percentage: 48.0, cost_price: 42.0, margin_percentage: 15.0, stock_quantity: 100 },
+  { id: 20, product_code: 'ASH-SWR-T75', product_name: 'Ashirwad SWR 75MM Nani Trap', unit: 'Pcs.', list_price: 144.0, discount_percentage: 48.0, cost_price: 60.0, margin_percentage: 15.0, stock_quantity: 100 },
+  { id: 21, product_code: 'ASH-SWR-P75', product_name: 'Ashirwad 75MM SWR Pipe', unit: 'Pcs.', list_price: 542.0, discount_percentage: 48.0, cost_price: 225.0, margin_percentage: 15.0, stock_quantity: 100 },
+  { id: 22, product_code: 'ASH-SWR-P110', product_name: 'Ashirwad 110MM SWR Pipe', unit: 'Pcs.', list_price: 942.0, discount_percentage: 48.0, cost_price: 390.0, margin_percentage: 15.0, stock_quantity: 100 },
+  { id: 23, product_code: 'NANDI-SWR-75', product_name: 'Nandi 75MM Swr Pipe', unit: 'Pcs.', list_price: 195.0, discount_percentage: 0.0, cost_price: 155.0, margin_percentage: 15.0, stock_quantity: 100 },
+  { id: 24, product_code: 'NANDI-SWR-110', product_name: 'Nandi 110MM Swr Pipe', unit: 'Pcs.', list_price: 340.0, discount_percentage: 0.0, cost_price: 275.0, margin_percentage: 15.0, stock_quantity: 100 },
+  { id: 25, product_code: 'NPVC-110', product_name: '110MM PVC Pipe Nandi', unit: 'Pcs.', list_price: 900.0, discount_percentage: 0.0, cost_price: 720.0, margin_percentage: 15.0, stock_quantity: 100 },
+  { id: 26, product_code: 'NPVC-90', product_name: '90MM PVC Pipe Nandi', unit: 'Pcs.', list_price: 630.0, discount_percentage: 0.0, cost_price: 505.0, margin_percentage: 15.0, stock_quantity: 100 },
 ]
 
 const INITIAL_CUSTOMERS: Customer[] = [
@@ -133,13 +132,6 @@ const INITIAL_CUSTOMERS: Customer[] = [
   { id: 3, customer_name: 'Srinivas Rao (Agri Works)', phone: '+91 94401 56789', customer_type_id: 3, type_name: 'Type C (Wholesale Farmer)', markup_percentage: 10 },
 ]
 
-const INITIAL_CUSTOMER_TYPES: CustomerType[] = [
-  { id: 1, type_name: 'Type A (Retail Regular)', markup_percentage: 0 },
-  { id: 2, type_name: 'Type B (Preferred Contractor)', markup_percentage: 5 },
-  { id: 3, type_name: 'Type C (Wholesale Farmer)', markup_percentage: 10 },
-  { id: 4, type_name: 'Type D (Bulk Distributor)', markup_percentage: 15 },
-  { id: 5, type_name: 'Type E (Special Commercial)', markup_percentage: 20 },
-]
 
 // ============================================================
 // LOGIN SCREEN COMPONENT (SHOPKEEPER PORTAL)
@@ -290,17 +282,35 @@ function App() {
   })
 
   // Landing page: Default is ALWAYS Dashboard
-  const [activePage, setActivePage] = useState<'Dashboard' | 'Estimator' | 'Products' | 'Customers' | 'Customer Types'>('Dashboard')
+  const [activePage, setActivePage] = useState<'Dashboard' | 'Estimator' | 'Products' | 'Customers' | 'Settings'>('Dashboard')
 
   // Stable sequential estimate number (retained across renders)
   const [currentEstimateNo, setCurrentEstimateNo] = useState<string>(() => {
     return localStorage.getItem('sri_current_estimate_no') || '2354'
   })
 
+  // Admin Feature Flags
+  const [enableListPriceMode, setEnableListPriceMode] = useState<boolean>(() => {
+    return localStorage.getItem('quoteflow_flag_list_price') === 'true'
+  })
+  const [enableFlatRupeeDiscount, setEnableFlatRupeeDiscount] = useState<boolean>(() => {
+    const stored = localStorage.getItem('quoteflow_flag_rupee_discount')
+    return stored !== null ? stored === 'true' : true
+  })
+
+  const toggleListPriceMode = (val: boolean) => {
+    setEnableListPriceMode(val)
+    localStorage.setItem('quoteflow_flag_list_price', String(val))
+  }
+
+  const toggleFlatRupeeDiscount = (val: boolean) => {
+    setEnableFlatRupeeDiscount(val)
+    localStorage.setItem('quoteflow_flag_rupee_discount', String(val))
+  }
+
   // Global Data (Pre-seeded with real items from paper slip so catalog is ALWAYS loaded)
   const [products, setProducts] = useState<Product[]>(INITIAL_PRODUCTS)
   const [customers, setCustomers] = useState<Customer[]>(INITIAL_CUSTOMERS)
-  const [customerTypes, setCustomerTypes] = useState<CustomerType[]>(INITIAL_CUSTOMER_TYPES)
   const [quotations, setQuotations] = useState<Quotation[]>([])
   const [dbStatus, setDbStatus] = useState<{ isConnected: boolean; isUsingTurso: boolean; message: string }>({
     isConnected: true,
@@ -340,7 +350,6 @@ function App() {
   const [showNewCustomerModal, setShowNewCustomerModal] = useState(false)
   const [newCustName, setNewCustName] = useState('')
   const [newCustPhone, setNewCustPhone] = useState('')
-  const [newCustTypeId, setNewCustTypeId] = useState(1)
 
   const [showNewProductModal, setShowNewProductModal] = useState(false)
   const [newProdName, setNewProdName] = useState('')
@@ -349,10 +358,9 @@ function App() {
   const [newProdList, setNewProdList] = useState<number | ''>('')
   const [newProdDis, setNewProdDis] = useState<number | ''>('')
   const [newProdCost, setNewProdCost] = useState<number | ''>('')
+  const [newProdMargin, setNewProdMargin] = useState<number | ''>(15)
 
   const [editProduct, setEditProduct] = useState<Product | null>(null)
-  const [editTier, setEditTier] = useState<CustomerType | null>(null)
-  const [tierMarkupInput, setTierMarkupInput] = useState<number>(0)
 
   // ============================================================
   // LOADERS
@@ -370,20 +378,6 @@ function App() {
       }
     } catch {
       // Keep optimistic connected state
-    }
-  }
-
-  const loadCustomerTypes = async () => {
-    try {
-      const res = await fetch(`${API_BASE}/customer-types`)
-      if (res.ok) {
-        const data = await res.json()
-        if (Array.isArray(data) && data.length > 0) {
-          setCustomerTypes(data)
-        }
-      }
-    } catch (e) {
-      console.error(e)
     }
   }
 
@@ -446,7 +440,6 @@ function App() {
 
   useEffect(() => {
     checkDb()
-    loadCustomerTypes()
     loadCustomers()
     loadProducts()
     loadQuotations()
@@ -455,52 +448,70 @@ function App() {
   // ============================================================
   // ESTIMATOR CALCULATIONS
   // ============================================================
-  const calculateRow = (row: EstimateRow, markupPct: number): EstimateRow => {
-    let basePrice = row.listPrice
-    if (row.discountPercentage > 0) {
-      basePrice = Number((row.listPrice * (1 - row.discountPercentage / 100)).toFixed(2))
+  const calculateRow = (row: EstimateRow): EstimateRow => {
+    let cost = Number(row.costPrice || 0)
+    const list = Number(row.listPrice || 0)
+    const tradeDis = Number(row.discountPercentage || 0)
+
+    // In List Price mode, cost price is derived from List Price * (1 - Trade Dis / 100)
+    if (enableListPriceMode && list > 0) {
+      cost = Number((list * (1 - tradeDis / 100)).toFixed(2))
     }
-    if (markupPct > 0) {
-      basePrice = Number((basePrice * (1 + markupPct / 100)).toFixed(2))
-    }
-    const lineTotal = Number((basePrice * row.quantity).toFixed(2))
+
+    const marginPct = Number(row.marginPercentage ?? 15)
+    // Formula: Price After Margin = Cost Price * (1 + Margin / 100)
+    const priceAfterMargin = Number((cost * (1 + marginPct / 100)).toFixed(2))
+
+    // Customer Discount (either percent % or flat ₹ rupee)
+    const dis = Number(row.discount || 0)
+    const disType = row.discountType || 'PERCENT'
+    const netPrice = disType === 'PERCENT'
+      ? Number((priceAfterMargin * (1 - dis / 100)).toFixed(2))
+      : Number(Math.max(0, priceAfterMargin - dis).toFixed(2))
+
+    const qty = Number(row.quantity || 0)
+    const lineTotal = Number((netPrice * qty).toFixed(2))
+
     return {
       ...row,
-      price: basePrice,
+      costPrice: cost,
+      marginPercentage: marginPct,
+      price: netPrice,
       lineTotal,
     }
   }
 
   const addProductToEstimate = (prod: Product) => {
-    const markup = selectedCustomer?.markup_percentage || 0
-    const newRow: EstimateRow = calculateRow(
-      {
-        id: `${Date.now()}-${Math.floor(Math.random() * 10000)}`,
-        productId: prod.id,
-        productCode: prod.product_code,
-        description: prod.product_name,
-        checked: false,
-        quantity: 1,
-        unit: prod.unit || 'Pcs.',
-        listPrice: prod.list_price || 0,
-        discountPercentage: prod.discount_percentage || 0,
-        price: 0,
-        lineTotal: 0,
-      },
-      markup
-    )
+    const cost = Number(prod.cost_price || 0)
+    const margin = Number(prod.margin_percentage ?? 15)
+    const newRow: EstimateRow = calculateRow({
+      id: `${Date.now()}-${Math.floor(Math.random() * 10000)}`,
+      productId: prod.id,
+      productCode: prod.product_code,
+      description: prod.product_name,
+      checked: false,
+      quantity: 1,
+      unit: prod.unit || 'Pcs.',
+      listPrice: prod.list_price || 0,
+      discountPercentage: prod.discount_percentage || 0,
+      costPrice: cost,
+      marginPercentage: margin,
+      discount: 0,
+      discountType: 'PERCENT',
+      price: 0,
+      lineTotal: 0,
+    })
     setEstimateRows((prev) => [...prev, newRow])
     setProductSearch('')
     setShowProductDropdown(false)
   }
 
   const updateRow = (id: string, field: keyof EstimateRow, val: string | number | boolean) => {
-    const markup = selectedCustomer?.markup_percentage || 0
     setEstimateRows((prev) =>
       prev.map((r) => {
         if (r.id !== id) return r
         const updated = { ...r, [field]: val }
-        return calculateRow(updated, markup)
+        return calculateRow(updated)
       })
     )
   }
@@ -508,12 +519,6 @@ function App() {
   const removeRow = (id: string) => {
     setEstimateRows((prev) => prev.filter((r) => r.id !== id))
   }
-
-  // Recalculate all rows if customer markup changes
-  useEffect(() => {
-    const markup = selectedCustomer?.markup_percentage || 0
-    setEstimateRows((prev) => prev.map((r) => calculateRow(r, markup)))
-  }, [selectedCustomer])
 
   // Summary Metrics
   const summary = useMemo(() => {
@@ -556,7 +561,7 @@ function App() {
         customerName: selectedCustomer.customer_name || 'Guest Walk-In',
         customerPhone: selectedCustomer.phone || '',
         customerTypeId: selectedCustomer.customer_type_id || 1,
-        markupPercentage: selectedCustomer.markup_percentage || 0,
+        markupPercentage: 0,
         items: estimateRows.map((r) => ({
           productId: r.productId,
           description: r.description,
@@ -564,6 +569,10 @@ function App() {
           unit: r.unit,
           listPrice: r.listPrice,
           discountPercentage: r.discountPercentage,
+          costPrice: r.costPrice,
+          marginPercentage: r.marginPercentage,
+          discount: r.discount,
+          discountType: r.discountType,
           price: r.price,
           lineTotal: r.lineTotal,
         })),
@@ -714,7 +723,7 @@ function App() {
         body: JSON.stringify({
           customerName: newCustName.trim(),
           phone: newCustPhone.trim(),
-          customerTypeId: Number(newCustTypeId),
+          customerTypeId: 1,
         }),
       })
       const data = await res.json()
@@ -746,6 +755,7 @@ function App() {
           listPrice: Number(newProdList || 0),
           discountPercentage: Number(newProdDis || 0),
           costPrice: Number(newProdCost || 0),
+          marginPercentage: Number(newProdMargin || 15),
           stockQuantity: 100,
         }),
       })
@@ -759,6 +769,7 @@ function App() {
         setNewProdList('')
         setNewProdDis('')
         setNewProdCost('')
+        setNewProdMargin(15)
       }
     } catch (e) {
       console.error(e)
@@ -864,15 +875,15 @@ function App() {
               </button>
 
               <button
-                onClick={() => setActivePage('Customer Types')}
+                onClick={() => setActivePage('Settings')}
                 className={`flex items-center gap-3 rounded-xl px-3.5 py-2.5 text-sm font-semibold transition-all cursor-pointer ${
-                  activePage === 'Customer Types'
+                  activePage === 'Settings'
                     ? 'bg-blue-600 text-white shadow-md shadow-blue-900/40'
                     : 'text-slate-300 hover:bg-slate-800/60 hover:text-white'
                 }`}
               >
-                <Tags className="h-4 w-4" />
-                <span>Customer Types</span>
+                <SlidersHorizontal className="h-4 w-4" />
+                <span>Admin Settings</span>
               </button>
             </nav>
           </div>
@@ -1012,8 +1023,8 @@ function App() {
                                 <span className="font-semibold text-slate-800">{c.customer_name}</span>
                                 <span className="text-xs text-slate-400">{c.phone || 'No phone'}</span>
                               </div>
-                              <span className="rounded-full bg-blue-50 px-2 py-0.5 text-[11px] font-semibold text-blue-700">
-                                {c.type_name || 'Retail'}
+                              <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-[11px] font-semibold text-slate-600">
+                                #{c.id}
                               </span>
                             </button>
                           ))
@@ -1038,7 +1049,7 @@ function App() {
                           customer_name: 'Guest Walk-In',
                           phone: '',
                           customer_type_id: 1,
-                          type_name: 'Type A (Retail Regular)',
+                          type_name: '',
                           markup_percentage: 0,
                         })
                         setCustomerSearch('')
@@ -1061,17 +1072,14 @@ function App() {
                       <div className="flex flex-col">
                         <div className="flex items-center gap-2">
                           <span className="font-bold text-slate-900">{selectedCustomer.customer_name}</span>
-                          <span className="rounded-full bg-emerald-100 px-2.5 py-0.5 text-[11px] font-bold text-emerald-800">
-                            {selectedCustomer.type_name || 'Standard Tier'}
-                            {Number(selectedCustomer.markup_percentage) > 0
-                              ? ` (+${selectedCustomer.markup_percentage}% Markup)`
-                              : ' (0% Markup)'}
+                          <span className="rounded-full bg-blue-50 px-2.5 py-0.5 text-[11px] font-bold text-blue-700">
+                            {selectedCustomer.id === 0 ? 'Cash Customer' : 'Counter Client'}
                           </span>
                         </div>
                         <span className="text-xs text-slate-500">{selectedCustomer.phone || 'Walk-in / Cash Customer'}</span>
                       </div>
                     </div>
-                    <div className="text-xs text-slate-400">Active customer for this quote</div>
+                    <div className="text-xs text-slate-400">Direct product margin pricing applied</div>
                   </div>
                 )}
               </div>
@@ -1125,11 +1133,22 @@ function App() {
                                   </span>
                                 </div>
                                 <div className="flex flex-col items-end">
-                                  <span className="font-bold text-slate-900">List: {formatINR(p.list_price)}</span>
-                                  {p.discount_percentage > 0 && (
-                                    <span className="text-xs text-emerald-600 font-semibold">
-                                      Dis: {p.discount_percentage}%
-                                    </span>
+                                  {enableListPriceMode ? (
+                                    <>
+                                      <span className="font-bold text-slate-900">List: {formatINR(p.list_price)}</span>
+                                      {p.discount_percentage > 0 && (
+                                        <span className="text-xs text-emerald-600 font-semibold">
+                                          Dis: {p.discount_percentage}%
+                                        </span>
+                                      )}
+                                    </>
+                                  ) : (
+                                    <>
+                                      <span className="font-bold text-slate-900">Cost: {formatINR(p.cost_price)}</span>
+                                      <span className="text-xs text-blue-600 font-semibold">
+                                        Margin: {p.margin_percentage ?? 15}%
+                                      </span>
+                                    </>
                                   )}
                                 </div>
                               </button>
@@ -1161,7 +1180,7 @@ function App() {
                   </button>
                 </div>
 
-                {/* Estimate Line Items Table (Matches paper receipt) */}
+                {/* Estimate Line Items Table (Matches paper receipt + exact margin formula) */}
                 <div className="overflow-x-auto rounded-xl border border-slate-200">
                   <table className="w-full text-left text-xs border-collapse">
                     <thead>
@@ -1171,8 +1190,16 @@ function App() {
                         <th className="py-3 px-2 text-center w-12">Chek</th>
                         <th className="py-3 px-3 text-right w-24">Qty.</th>
                         <th className="py-3 px-3 w-20">Unit</th>
-                        <th className="py-3 px-3 text-right w-28">List Price</th>
-                        <th className="py-3 px-3 text-right w-20">Dis%</th>
+                        {enableListPriceMode && (
+                          <>
+                            <th className="py-3 px-3 text-right w-24">List Price (₹)</th>
+                            <th className="py-3 px-3 text-right w-20">Trade Dis%</th>
+                          </>
+                        )}
+                        <th className="py-3 px-3 text-right w-28">Cost Price (₹)</th>
+                        <th className="py-3 px-3 text-right w-20">Margin%</th>
+                        <th className="py-3 px-3 text-right w-24">Price + Margin</th>
+                        <th className="py-3 px-3 text-right w-32">Cust. Dis</th>
                         <th className="py-3 px-3 text-right w-28">Net Price</th>
                         <th className="py-3 px-3 text-right w-32">Amount (₹)</th>
                         <th className="py-3 px-2 text-center w-12">Action</th>
@@ -1181,7 +1208,7 @@ function App() {
                     <tbody className="divide-y divide-slate-100 text-slate-800 font-medium">
                       {estimateRows.length === 0 ? (
                         <tr>
-                          <td colSpan={10} className="py-12 text-center text-slate-400 text-sm">
+                          <td colSpan={enableListPriceMode ? 14 : 12} className="py-12 text-center text-slate-400 text-sm">
                             No items added to estimate yet. Use the product search bar above to add items.
                           </td>
                         </tr>
@@ -1229,36 +1256,115 @@ function App() {
                                 <option value="Ft.">Ft.</option>
                               </select>
                             </td>
+
+                            {/* Optional List Price & Trade Dis% columns when Flag 1 is ON */}
+                            {enableListPriceMode && (
+                              <>
+                                <td className="py-2.5 px-3 text-right">
+                                  <input
+                                    type="number"
+                                    step="0.01"
+                                    value={row.listPrice}
+                                    onChange={(e) => updateRow(row.id, 'listPrice', parseFloat(e.target.value) || 0)}
+                                    className="w-20 rounded border border-slate-200 bg-white px-2 py-1 text-right font-semibold text-slate-700 outline-none focus:border-blue-500"
+                                  />
+                                </td>
+                                <td className="py-2.5 px-3 text-right">
+                                  <input
+                                    type="number"
+                                    step="0.01"
+                                    value={row.discountPercentage}
+                                    onChange={(e) =>
+                                      updateRow(row.id, 'discountPercentage', parseFloat(e.target.value) || 0)
+                                    }
+                                    className="w-16 rounded border border-slate-200 bg-white px-2 py-1 text-right font-semibold text-emerald-700 outline-none focus:border-blue-500"
+                                  />
+                                </td>
+                              </>
+                            )}
+
+                            {/* Cost Price */}
                             <td className="py-2.5 px-3 text-right">
                               <input
                                 type="number"
                                 step="0.01"
-                                value={row.listPrice}
-                                onChange={(e) => updateRow(row.id, 'listPrice', parseFloat(e.target.value) || 0)}
-                                className="w-24 rounded border border-slate-200 bg-white px-2 py-1 text-right font-semibold text-slate-800 outline-none focus:border-blue-500"
+                                value={row.costPrice}
+                                onChange={(e) => updateRow(row.id, 'costPrice', parseFloat(e.target.value) || 0)}
+                                className="w-20 rounded border border-slate-200 bg-white px-2 py-1 text-right font-bold text-slate-900 outline-none focus:border-blue-500"
                               />
                             </td>
+
+                            {/* Margin % */}
                             <td className="py-2.5 px-3 text-right">
                               <input
                                 type="number"
-                                step="0.01"
-                                value={row.discountPercentage}
-                                onChange={(e) =>
-                                  updateRow(row.id, 'discountPercentage', parseFloat(e.target.value) || 0)
-                                }
-                                className="w-16 rounded border border-slate-200 bg-white px-2 py-1 text-right font-semibold text-emerald-700 outline-none focus:border-blue-500"
+                                step="0.5"
+                                value={row.marginPercentage}
+                                onChange={(e) => updateRow(row.id, 'marginPercentage', parseFloat(e.target.value) || 0)}
+                                className="w-16 rounded border border-blue-200 bg-blue-50/50 px-2 py-1 text-right font-bold text-blue-700 outline-none focus:border-blue-500"
                               />
                             </td>
-                            <td className="py-2.5 px-3 text-right font-semibold text-slate-700">
+
+                            {/* Price After Margin */}
+                            <td className="py-2.5 px-3 text-right font-semibold text-slate-500">
+                              {formatINR(Number((row.costPrice * (1 + (row.marginPercentage || 0) / 100)).toFixed(2)))}
+                            </td>
+
+                            {/* Customer Discount (supports % and Flat ₹ when Flag 2 is ON) */}
+                            <td className="py-2.5 px-3 text-right">
+                              <div className="flex items-center justify-end gap-1">
+                                <input
+                                  type="number"
+                                  step="0.01"
+                                  min="0"
+                                  value={row.discount || ''}
+                                  placeholder="0"
+                                  onChange={(e) => updateRow(row.id, 'discount', parseFloat(e.target.value) || 0)}
+                                  className="w-16 rounded border border-slate-200 bg-white px-2 py-1 text-right font-semibold text-emerald-700 outline-none focus:border-blue-500"
+                                />
+                                {enableFlatRupeeDiscount ? (
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      updateRow(
+                                        row.id,
+                                        'discountType',
+                                        row.discountType === 'RUPEE' ? 'PERCENT' : 'RUPEE'
+                                      )
+                                    }
+                                    className={`px-1.5 py-0.5 text-[10px] font-extrabold rounded border cursor-pointer ${
+                                      row.discountType === 'RUPEE'
+                                        ? 'bg-amber-100 text-amber-800 border-amber-300'
+                                        : 'bg-emerald-100 text-emerald-800 border-emerald-300'
+                                    }`}
+                                    title={
+                                      row.discountType === 'RUPEE'
+                                        ? 'Flat ₹ Cash Discount (Click to switch to %)'
+                                        : '% Percentage Discount (Click to switch to ₹)'
+                                    }
+                                  >
+                                    {row.discountType === 'RUPEE' ? '₹' : '%'}
+                                  </button>
+                                ) : (
+                                  <span className="text-xs font-bold text-slate-400">%</span>
+                                )}
+                              </div>
+                            </td>
+
+                            {/* Net Price */}
+                            <td className="py-2.5 px-3 text-right font-bold text-blue-700">
                               {formatINR(row.price)}
                             </td>
-                            <td className="py-2.5 px-3 text-right font-bold text-slate-900">
+
+                            {/* Amount */}
+                            <td className="py-2.5 px-3 text-right font-black text-slate-900">
                               {formatINR(row.lineTotal)}
                             </td>
+
                             <td className="py-2.5 px-2 text-center">
                               <button
                                 onClick={() => removeRow(row.id)}
-                                className="p-1 text-slate-400 hover:text-red-600 transition-colors"
+                                className="p-1 text-slate-400 hover:text-red-600 transition-colors cursor-pointer"
                                 title="Remove item"
                               >
                                 <Trash2 className="h-4 w-4" />
@@ -1268,7 +1374,7 @@ function App() {
                         ))
                       )}
                     </tbody>
-                    {/* Totals Table Footer (Mirroring Paper Slip) */}
+                    {/* Totals Table Footer */}
                     {estimateRows.length > 0 && (
                       <tfoot>
                         <tr className="bg-slate-100 font-bold text-slate-900 border-t-2 border-slate-300">
@@ -1278,7 +1384,7 @@ function App() {
                           <td colSpan={2} className="py-3 px-3 text-left font-black text-blue-700">
                             {summary.totalUnits.toFixed(2)} Units
                           </td>
-                          <td colSpan={3} className="py-3 px-3 text-right text-slate-500 font-semibold">
+                          <td colSpan={enableListPriceMode ? 7 : 5} className="py-3 px-3 text-right text-slate-500 font-semibold">
                             Total Estimate:
                           </td>
                           <td className="py-3 px-3 text-right text-emerald-700 text-sm font-black">
@@ -1431,9 +1537,14 @@ function App() {
                         <th className="py-3 px-4">Code</th>
                         <th className="py-3 px-4">Product Name</th>
                         <th className="py-3 px-3">Unit</th>
-                        <th className="py-3 px-4 text-right">List Price (₹)</th>
-                        <th className="py-3 px-3 text-right">Dis%</th>
+                        {enableListPriceMode && (
+                          <>
+                            <th className="py-3 px-4 text-right">List Price (₹)</th>
+                            <th className="py-3 px-3 text-right">Dis%</th>
+                          </>
+                        )}
                         <th className="py-3 px-4 text-right">Cost Price (₹)</th>
+                        <th className="py-3 px-3 text-right">Margin%</th>
                         <th className="py-3 px-4 text-center">Actions</th>
                       </tr>
                     </thead>
@@ -1447,19 +1558,28 @@ function App() {
                               {p.unit}
                             </span>
                           </td>
-                          <td className="py-3 px-4 text-right font-bold text-slate-900">
-                            {formatINR(p.list_price)}
+                          {enableListPriceMode && (
+                            <>
+                              <td className="py-3 px-4 text-right font-bold text-slate-900">
+                                {formatINR(p.list_price)}
+                              </td>
+                              <td className="py-3 px-3 text-right font-bold text-emerald-600">
+                                {p.discount_percentage}%
+                              </td>
+                            </>
+                          )}
+                          <td className="py-3 px-4 text-right font-bold text-slate-900">{formatINR(p.cost_price)}</td>
+                          <td className="py-3 px-3 text-right">
+                            <span className="rounded-full bg-blue-50 px-2.5 py-0.5 text-xs font-bold text-blue-700">
+                              +{p.margin_percentage ?? 15}%
+                            </span>
                           </td>
-                          <td className="py-3 px-3 text-right font-bold text-emerald-600">
-                            {p.discount_percentage}%
-                          </td>
-                          <td className="py-3 px-4 text-right text-slate-500">{formatINR(p.cost_price)}</td>
                           <td className="py-3 px-4 text-center">
                             <button
                               onClick={() => {
                                 setEditProduct(p)
                               }}
-                              className="rounded p-1 text-slate-400 hover:text-blue-600 mr-2"
+                              className="rounded p-1 text-slate-400 hover:text-blue-600 mr-2 cursor-pointer"
                               title="Edit product"
                             >
                               <Pencil className="h-4 w-4" />
@@ -1471,7 +1591,7 @@ function App() {
                                   loadProducts()
                                 }
                               }}
-                              className="rounded p-1 text-slate-400 hover:text-red-600"
+                              className="rounded p-1 text-slate-400 hover:text-red-600 cursor-pointer"
                               title="Delete product"
                             >
                               <Trash2 className="h-4 w-4" />
@@ -1495,12 +1615,12 @@ function App() {
                 <div>
                   <h1 className="text-2xl font-bold tracking-tight text-slate-900">Customer Directory</h1>
                   <p className="mt-0.5 text-sm text-slate-500">
-                    Client list, phone numbers, and pricing tier associations
+                    Client list, counter walk-ins, and phone records
                   </p>
                 </div>
                 <button
                   onClick={() => setShowNewCustomerModal(true)}
-                  className="flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-xs font-bold text-white hover:bg-blue-700 transition-colors shadow-sm"
+                  className="flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-xs font-bold text-white hover:bg-blue-700 transition-colors shadow-sm cursor-pointer"
                 >
                   <Plus className="h-4 w-4" />
                   <span>Add Customer</span>
@@ -1514,8 +1634,6 @@ function App() {
                       <tr className="bg-slate-100 font-bold uppercase tracking-wider text-slate-600 border-b border-slate-200">
                         <th className="py-3 px-4">Name</th>
                         <th className="py-3 px-4">Phone</th>
-                        <th className="py-3 px-4">Customer Tier</th>
-                        <th className="py-3 px-4">Applied Margin</th>
                         <th className="py-3 px-4 text-center">Actions</th>
                       </tr>
                     </thead>
@@ -1524,23 +1642,15 @@ function App() {
                         <tr key={c.id} className="hover:bg-slate-50 transition-colors">
                           <td className="py-3 px-4 font-bold text-slate-900">{c.customer_name}</td>
                           <td className="py-3 px-4 text-slate-600">{c.phone || 'N/A'}</td>
-                          <td className="py-3 px-4">
-                            <span className="rounded-full bg-blue-50 px-2.5 py-1 text-xs font-bold text-blue-700">
-                              {c.type_name || 'Standard'}
-                            </span>
-                          </td>
-                          <td className="py-3 px-4 font-bold text-emerald-700">
-                            +{c.markup_percentage || 0}% Markup
-                          </td>
                           <td className="py-3 px-4 text-center">
                             <button
                               onClick={() => {
                                 setSelectedCustomer(c)
                                 setActivePage('Estimator')
                               }}
-                              className="rounded-lg bg-slate-100 px-3 py-1 text-xs font-bold text-slate-700 hover:bg-blue-50 hover:text-blue-700 transition-colors"
+                              className="rounded-lg bg-blue-50 px-3.5 py-1.5 text-xs font-bold text-blue-700 hover:bg-blue-100 transition-colors cursor-pointer"
                             >
-                              New Quote
+                              New Estimate
                             </button>
                           </td>
                         </tr>
@@ -1553,53 +1663,101 @@ function App() {
           )}
 
           {/* ============================================================ */}
-          {/* VIEW: CUSTOMER TYPES (TIER CONFIGURATION) */}
+          {/* VIEW: ADMIN SETTINGS & FEATURE FLAGS */}
           {/* ============================================================ */}
-          {activePage === 'Customer Types' && (
+          {activePage === 'Settings' && (
             <div className="space-y-6">
               <div>
-                <h1 className="text-2xl font-bold tracking-tight text-slate-900">Customer Types & Margins</h1>
+                <h1 className="text-2xl font-bold tracking-tight text-slate-900">Admin Settings & Pricing Modes</h1>
                 <p className="mt-0.5 text-sm text-slate-500">
-                  Configure default profit markup percentages per customer classification tier
+                  Configure feature flags and counter pricing behaviors for Sri Venkateshwara Trading & Co.
                 </p>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {customerTypes.map((tier) => (
-                  <div
-                    key={tier.id}
-                    className="rounded-2xl bg-white p-6 shadow-sm border border-slate-200/80 flex flex-col justify-between"
-                  >
-                    <div>
-                      <div className="flex items-center justify-between mb-3">
-                        <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-bold text-blue-700">
-                          Tier ID #{tier.id}
-                        </span>
-                        <Percent className="h-4 w-4 text-slate-400" />
-                      </div>
-                      <h3 className="text-lg font-bold text-slate-900">{tier.type_name}</h3>
-                      <p className="text-xs text-slate-500 mt-1">
-                        Applied automatically to all estimates created for customers in this tier.
-                      </p>
-                    </div>
-
-                    <div className="mt-6 pt-4 border-t border-slate-100 flex items-center justify-between">
-                      <div>
-                        <span className="text-xs font-semibold text-slate-400 uppercase">Profit Margin</span>
-                        <div className="text-2xl font-black text-emerald-600">+{tier.markup_percentage}%</div>
-                      </div>
-                      <button
-                        onClick={() => {
-                          setEditTier(tier)
-                          setTierMarkupInput(tier.markup_percentage)
-                        }}
-                        className="rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-100"
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Feature Flag 1: List Price Mode */}
+                <div className="rounded-2xl bg-white p-6 shadow-sm border border-slate-200/80 flex flex-col justify-between">
+                  <div>
+                    <div className="flex items-center justify-between mb-4">
+                      <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-bold text-blue-700">
+                        Feature Flag 1
+                      </span>
+                      <span
+                        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold ${
+                          enableListPriceMode ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-600'
+                        }`}
                       >
-                        Adjust Margin
-                      </button>
+                        {enableListPriceMode ? 'ENABLED' : 'DISABLED'}
+                      </span>
                     </div>
+                    <h3 className="text-lg font-bold text-slate-900">Manufacturer List Price & Trade Discount</h3>
+                    <p className="text-xs text-slate-600 mt-2 leading-relaxed">
+                      <b>Enabled:</b> Product catalog and Estimator show manufacturer List Price and Trade Discount % columns to derive Cost Price.
+                      <br />
+                      <br />
+                      <b>Disabled (Default):</b> Direct Cost Price counter mode without list price and manufacturer discount overhead.
+                    </p>
                   </div>
-                ))}
+
+                  <div className="mt-6 pt-4 border-t border-slate-100 flex items-center justify-between">
+                    <span className="text-xs font-bold text-slate-700">Toggle Mode:</span>
+                    <button
+                      type="button"
+                      onClick={() => toggleListPriceMode(!enableListPriceMode)}
+                      className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                        enableListPriceMode ? 'bg-blue-600' : 'bg-slate-300'
+                      }`}
+                    >
+                      <span
+                        className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                          enableListPriceMode ? 'translate-x-5' : 'translate-x-0'
+                        }`}
+                      />
+                    </button>
+                  </div>
+                </div>
+
+                {/* Feature Flag 2: Flat Rupee Cash Discount */}
+                <div className="rounded-2xl bg-white p-6 shadow-sm border border-slate-200/80 flex flex-col justify-between">
+                  <div>
+                    <div className="flex items-center justify-between mb-4">
+                      <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-bold text-blue-700">
+                        Feature Flag 2
+                      </span>
+                      <span
+                        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold ${
+                          enableFlatRupeeDiscount ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-600'
+                        }`}
+                      >
+                        {enableFlatRupeeDiscount ? 'ENABLED' : 'DISABLED'}
+                      </span>
+                    </div>
+                    <h3 className="text-lg font-bold text-slate-900">Flat Rupee (₹) Discount Round-off</h3>
+                    <p className="text-xs text-slate-600 mt-2 leading-relaxed">
+                      <b>Enabled (Default):</b> Allows switching line item customer discounts between percentage (%) and flat rupee (₹) cash discounts for quick customer bill round-offs.
+                      <br />
+                      <br />
+                      <b>Disabled:</b> Discounts are strictly percentage (%) based.
+                    </p>
+                  </div>
+
+                  <div className="mt-6 pt-4 border-t border-slate-100 flex items-center justify-between">
+                    <span className="text-xs font-bold text-slate-700">Toggle Mode:</span>
+                    <button
+                      type="button"
+                      onClick={() => toggleFlatRupeeDiscount(!enableFlatRupeeDiscount)}
+                      className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                        enableFlatRupeeDiscount ? 'bg-blue-600' : 'bg-slate-300'
+                      }`}
+                    >
+                      <span
+                        className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                          enableFlatRupeeDiscount ? 'translate-x-5' : 'translate-x-0'
+                        }`}
+                      />
+                    </button>
+                  </div>
+                </div>
               </div>
             </div>
           )}
@@ -1863,31 +2021,17 @@ function App() {
                   className="w-full rounded-xl border border-slate-200 px-3.5 py-2 text-sm outline-none focus:border-blue-500"
                 />
               </div>
-              <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">Customer Pricing Tier</label>
-                <select
-                  value={newCustTypeId}
-                  onChange={(e) => setNewCustTypeId(Number(e.target.value))}
-                  className="w-full rounded-xl border border-slate-200 px-3.5 py-2 text-sm outline-none focus:border-blue-500"
-                >
-                  {customerTypes.map((t) => (
-                    <option key={t.id} value={t.id}>
-                      {t.type_name} (+{t.markup_percentage}% Markup)
-                    </option>
-                  ))}
-                </select>
-              </div>
               <div className="flex justify-end gap-2 pt-2">
                 <button
                   type="button"
                   onClick={() => setShowNewCustomerModal(false)}
-                  className="rounded-xl border border-slate-200 px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50"
+                  className="rounded-xl border border-slate-200 px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50 cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="rounded-xl bg-blue-600 px-5 py-2 text-xs font-bold text-white hover:bg-blue-700"
+                  className="rounded-xl bg-blue-600 px-5 py-2 text-xs font-bold text-white hover:bg-blue-700 cursor-pointer shadow-sm"
                 >
                   Save Customer
                 </button>
@@ -1903,7 +2047,7 @@ function App() {
           <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl">
             <div className="flex items-center justify-between pb-4 border-b border-slate-100">
               <h3 className="text-base font-bold text-slate-800">Add New Product to Catalog</h3>
-              <button onClick={() => setShowNewProductModal(false)} className="text-slate-400 hover:text-slate-600">
+              <button onClick={() => setShowNewProductModal(false)} className="text-slate-400 hover:text-slate-600 cursor-pointer">
                 <X className="h-5 w-5" />
               </button>
             </div>
@@ -1948,155 +2092,114 @@ function App() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-3 gap-3">
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">List Price (₹) *</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    required
-                    placeholder="462.00"
-                    value={newProdList}
-                    onChange={(e) => {
-                      const val = parseFloat(e.target.value) || ''
-                      setNewProdList(val)
-                      const listNum = typeof val === 'number' ? val : 0
-                      const disNum = typeof newProdDis === 'number' ? newProdDis : 0
-                      if (listNum > 0) {
-                        setNewProdCost(Number((listNum * (1 - disNum / 100)).toFixed(2)))
-                      }
-                    }}
-                    className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-500 font-bold"
-                  />
+              {enableListPriceMode ? (
+                <div className="grid grid-cols-4 gap-2.5">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">List (₹) *</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      required
+                      placeholder="462.00"
+                      value={newProdList}
+                      onChange={(e) => {
+                        const val = parseFloat(e.target.value) || ''
+                        setNewProdList(val)
+                        const listNum = typeof val === 'number' ? val : 0
+                        const disNum = typeof newProdDis === 'number' ? newProdDis : 0
+                        if (listNum > 0) {
+                          setNewProdCost(Number((listNum * (1 - disNum / 100)).toFixed(2)))
+                        }
+                      }}
+                      className="w-full rounded-xl border border-slate-200 px-2.5 py-2 text-xs outline-none focus:border-blue-500 font-bold"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">Trade Dis%</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      placeholder="54.00"
+                      value={newProdDis}
+                      onChange={(e) => {
+                        const val = parseFloat(e.target.value) || ''
+                        setNewProdDis(val)
+                        const listNum = typeof newProdList === 'number' ? newProdList : 0
+                        const disNum = typeof val === 'number' ? val : 0
+                        if (listNum > 0) {
+                          setNewProdCost(Number((listNum * (1 - disNum / 100)).toFixed(2)))
+                        }
+                      }}
+                      className="w-full rounded-xl border border-slate-200 px-2.5 py-2 text-xs outline-none focus:border-blue-500 font-bold text-emerald-600"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">Cost (₹)</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      placeholder="Auto"
+                      value={newProdCost}
+                      onChange={(e) => setNewProdCost(parseFloat(e.target.value) || '')}
+                      className="w-full rounded-xl border border-slate-200 px-2.5 py-2 text-xs outline-none focus:border-blue-500 text-slate-700 font-semibold"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">Margin%</label>
+                    <input
+                      type="number"
+                      step="0.5"
+                      placeholder="15"
+                      value={newProdMargin}
+                      onChange={(e) => setNewProdMargin(parseFloat(e.target.value) || '')}
+                      className="w-full rounded-xl border border-blue-200 bg-blue-50/40 px-2.5 py-2 text-xs outline-none focus:border-blue-500 font-bold text-blue-700"
+                    />
+                  </div>
                 </div>
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">Trade Dis%</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    placeholder="54.00"
-                    value={newProdDis}
-                    onChange={(e) => {
-                      const val = parseFloat(e.target.value) || ''
-                      setNewProdDis(val)
-                      const listNum = typeof newProdList === 'number' ? newProdList : 0
-                      const disNum = typeof val === 'number' ? val : 0
-                      if (listNum > 0) {
-                        setNewProdCost(Number((listNum * (1 - disNum / 100)).toFixed(2)))
-                      }
-                    }}
-                    className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-500 font-bold text-emerald-600"
-                  />
+              ) : (
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">Cost Price (₹) *</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      required
+                      placeholder="175.00"
+                      value={newProdCost}
+                      onChange={(e) => setNewProdCost(parseFloat(e.target.value) || '')}
+                      className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-500 text-slate-900 font-bold"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">Product Margin (%)</label>
+                    <input
+                      type="number"
+                      step="0.5"
+                      placeholder="15"
+                      value={newProdMargin}
+                      onChange={(e) => setNewProdMargin(parseFloat(e.target.value) || '')}
+                      className="w-full rounded-xl border border-blue-200 bg-blue-50/40 px-3 py-2 text-sm outline-none focus:border-blue-500 font-bold text-blue-700"
+                    />
+                  </div>
                 </div>
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">Cost Price (₹)</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    placeholder="Auto-calculated"
-                    value={newProdCost}
-                    onChange={(e) => setNewProdCost(parseFloat(e.target.value) || '')}
-                    className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-500 text-slate-700 font-semibold"
-                  />
-                </div>
-              </div>
+              )}
 
               <div className="flex justify-end gap-2 pt-2">
                 <button
                   type="button"
                   onClick={() => setShowNewProductModal(false)}
-                  className="rounded-xl border border-slate-200 px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50"
+                  className="rounded-xl border border-slate-200 px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50 cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="rounded-xl bg-blue-600 px-5 py-2 text-xs font-bold text-white hover:bg-blue-700 shadow-sm"
+                  className="rounded-xl bg-blue-600 px-5 py-2 text-xs font-bold text-white hover:bg-blue-700 shadow-sm cursor-pointer"
                 >
                   Save & Add to Quote
                 </button>
               </div>
             </form>
-          </div>
-        </div>
-      )}
-
-      {/* Edit Tier Modal */}
-      {editTier && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-2xl">
-            <h3 className="text-base font-bold text-slate-800">Adjust Tier Margin</h3>
-            <p className="text-xs text-slate-500 mt-1">{editTier.type_name}</p>
-
-            <div className="my-4">
-              <label className="block text-xs font-bold text-slate-700 mb-1">Profit Markup Percentage (%)</label>
-              <input
-                type="number"
-                step="0.5"
-                value={tierMarkupInput}
-                onChange={(e) => setTierMarkupInput(parseFloat(e.target.value) || 0)}
-                className="w-full rounded-xl border border-slate-200 px-3.5 py-2 text-base font-bold text-emerald-600 outline-none focus:border-blue-500"
-              />
-            </div>
-
-            <div className="flex justify-end gap-2">
-              <button
-                onClick={() => setEditTier(null)}
-                className="rounded-xl border border-slate-200 px-4 py-2 text-xs font-bold text-slate-600"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={async () => {
-                  if (!editTier) return
-                  try {
-                    const newMarkup = Number(tierMarkupInput) || 0
-
-                    // Optimistic update in customerTypes
-                    setCustomerTypes((prev) =>
-                      prev.map((t) => (t.id === editTier.id ? { ...t, markup_percentage: newMarkup } : t))
-                    )
-
-                    // Update customers list in memory
-                    setCustomers((prev) =>
-                      prev.map((c) =>
-                        c.customer_type_id === editTier.id
-                          ? { ...c, markup_percentage: newMarkup }
-                          : c
-                      )
-                    )
-
-                    // If currently active customer belongs to this tier, update them
-                    if (selectedCustomer && selectedCustomer.customer_type_id === editTier.id) {
-                      setSelectedCustomer((prev) => ({
-                        ...prev,
-                        markup_percentage: newMarkup,
-                      }))
-                    }
-
-                    // Call backend API
-                    await fetch(`${API_BASE}/customer-types/${editTier.id}`, {
-                      method: 'PUT',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({ 
-                        markup: newMarkup,
-                        markupPercentage: newMarkup 
-                      }),
-                    })
-
-                    loadCustomerTypes()
-                    loadCustomers()
-                  } catch (err) {
-                    console.error('Save margin error:', err)
-                  } finally {
-                    setEditTier(null)
-                  }
-                }}
-                className="rounded-xl bg-blue-600 px-4 py-2 text-xs font-bold text-white hover:bg-blue-700 cursor-pointer shadow-sm"
-              >
-                Save Margin
-              </button>
-            </div>
           </div>
         </div>
       )}
@@ -2107,7 +2210,7 @@ function App() {
           <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl">
             <div className="flex items-center justify-between pb-4 border-b border-slate-100">
               <h3 className="text-base font-bold text-slate-800">Edit Product: {editProduct.product_name}</h3>
-              <button onClick={() => setEditProduct(null)} className="text-slate-400 hover:text-slate-600">
+              <button onClick={() => setEditProduct(null)} className="text-slate-400 hover:text-slate-600 cursor-pointer">
                 <X className="h-5 w-5" />
               </button>
             </div>
@@ -2124,6 +2227,7 @@ function App() {
                     listPrice: editProduct.list_price,
                     discountPercentage: editProduct.discount_percentage,
                     costPrice: editProduct.cost_price,
+                    marginPercentage: editProduct.margin_percentage,
                     stockQuantity: editProduct.stock_quantity,
                   }),
                 })
@@ -2168,59 +2272,104 @@ function App() {
                   </select>
                 </div>
               </div>
-              <div className="grid grid-cols-3 gap-3">
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">List Price (₹)</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    value={editProduct.list_price}
-                    onChange={(e) => {
-                      const list = parseFloat(e.target.value) || 0
-                      const dis = editProduct.discount_percentage || 0
-                      const cost = Number((list * (1 - dis / 100)).toFixed(2))
-                      setEditProduct({ ...editProduct, list_price: list, cost_price: cost })
-                    }}
-                    className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-500 font-bold"
-                  />
+
+              {enableListPriceMode ? (
+                <div className="grid grid-cols-4 gap-2.5">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">List (₹)</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={editProduct.list_price}
+                      onChange={(e) => {
+                        const list = parseFloat(e.target.value) || 0
+                        const dis = editProduct.discount_percentage || 0
+                        const cost = Number((list * (1 - dis / 100)).toFixed(2))
+                        setEditProduct({ ...editProduct, list_price: list, cost_price: cost })
+                      }}
+                      className="w-full rounded-xl border border-slate-200 px-2.5 py-2 text-xs outline-none focus:border-blue-500 font-bold"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">Trade Dis%</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={editProduct.discount_percentage}
+                      onChange={(e) => {
+                        const dis = parseFloat(e.target.value) || 0
+                        const list = editProduct.list_price || 0
+                        const cost = Number((list * (1 - dis / 100)).toFixed(2))
+                        setEditProduct({ ...editProduct, discount_percentage: dis, cost_price: cost })
+                      }}
+                      className="w-full rounded-xl border border-slate-200 px-2.5 py-2 text-xs outline-none focus:border-blue-500 font-bold text-emerald-600"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">Cost (₹)</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={editProduct.cost_price}
+                      onChange={(e) =>
+                        setEditProduct({ ...editProduct, cost_price: parseFloat(e.target.value) || 0 })
+                      }
+                      className="w-full rounded-xl border border-slate-200 px-2.5 py-2 text-xs outline-none focus:border-blue-500 font-bold text-slate-700"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">Margin%</label>
+                    <input
+                      type="number"
+                      step="0.5"
+                      value={editProduct.margin_percentage ?? 15}
+                      onChange={(e) =>
+                        setEditProduct({ ...editProduct, margin_percentage: parseFloat(e.target.value) || 0 })
+                      }
+                      className="w-full rounded-xl border border-blue-200 bg-blue-50/40 px-2.5 py-2 text-xs outline-none focus:border-blue-500 font-bold text-blue-700"
+                    />
+                  </div>
                 </div>
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">Trade Dis%</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    value={editProduct.discount_percentage}
-                    onChange={(e) => {
-                      const dis = parseFloat(e.target.value) || 0
-                      const list = editProduct.list_price || 0
-                      const cost = Number((list * (1 - dis / 100)).toFixed(2))
-                      setEditProduct({ ...editProduct, discount_percentage: dis, cost_price: cost })
-                    }}
-                    className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-500 font-bold text-emerald-600"
-                  />
+              ) : (
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">Cost Price (₹)</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={editProduct.cost_price}
+                      onChange={(e) =>
+                        setEditProduct({ ...editProduct, cost_price: parseFloat(e.target.value) || 0 })
+                      }
+                      className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-500 font-bold text-slate-900"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">Product Margin (%)</label>
+                    <input
+                      type="number"
+                      step="0.5"
+                      value={editProduct.margin_percentage ?? 15}
+                      onChange={(e) =>
+                        setEditProduct({ ...editProduct, margin_percentage: parseFloat(e.target.value) || 0 })
+                      }
+                      className="w-full rounded-xl border border-blue-200 bg-blue-50/40 px-3 py-2 text-sm outline-none focus:border-blue-500 font-bold text-blue-700"
+                    />
+                  </div>
                 </div>
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">Cost Price (₹)</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    value={editProduct.cost_price}
-                    onChange={(e) => setEditProduct({ ...editProduct, cost_price: parseFloat(e.target.value) || 0 })}
-                    className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-500 font-bold text-slate-700"
-                  />
-                </div>
-              </div>
+              )}
+
               <div className="flex justify-end gap-2 pt-2">
                 <button
                   type="button"
                   onClick={() => setEditProduct(null)}
-                  className="rounded-xl border border-slate-200 px-4 py-2 text-xs font-bold text-slate-600"
+                  className="rounded-xl border border-slate-200 px-4 py-2 text-xs font-bold text-slate-600 cursor-pointer hover:bg-slate-50"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="rounded-xl bg-blue-600 px-5 py-2 text-xs font-bold text-white hover:bg-blue-700"
+                  className="rounded-xl bg-blue-600 px-5 py-2 text-xs font-bold text-white hover:bg-blue-700 cursor-pointer shadow-sm"
                 >
                   Update Product
                 </button>

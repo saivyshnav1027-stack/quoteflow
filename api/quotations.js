@@ -120,17 +120,28 @@ export default async function handler(req, res) {
       const processedItems = items.map((item) => {
         const qty = Number(item.quantity || 1)
         const listPrice = Number(item.listPrice || 0)
-        const dis = Number(item.discountPercentage || 0)
+        const discountPercentage = Number(item.discountPercentage || 0)
+        const costPrice = Number(item.costPrice ?? item.cost_price ?? 0)
+        const marginPercentage = Number(item.marginPercentage ?? item.margin_percentage ?? 0)
+        const discount = Number(item.discount ?? 0)
+        const discountType = String(item.discountType ?? item.discount_type ?? 'PERCENT').toUpperCase()
 
-        // Frontend calculates the net unit price including tier markup.
-        // Recalculate accurately only if netPrice is missing or <= 0.
         let netPrice = Number(item.price)
         if (Number.isNaN(netPrice) || netPrice <= 0) {
-          let base = listPrice > 0 ? Number((listPrice * (1 - dis / 100)).toFixed(2)) : 0
-          if (markupPercentage > 0) {
-            base = Number((base * (1 + markupPercentage / 100)).toFixed(2))
+          if (costPrice > 0) {
+            const priceAfterMargin = Number((costPrice * (1 + marginPercentage / 100)).toFixed(2))
+            if (discountType === 'FLAT' || discountType === 'RUPEE' || discountType === 'AMOUNT') {
+              netPrice = Number(Math.max(0, priceAfterMargin - discount).toFixed(2))
+            } else {
+              netPrice = Number((priceAfterMargin * (1 - discount / 100)).toFixed(2))
+            }
+          } else {
+            let base = listPrice > 0 ? Number((listPrice * (1 - discountPercentage / 100)).toFixed(2)) : 0
+            if (markupPercentage > 0) {
+              base = Number((base * (1 + markupPercentage / 100)).toFixed(2))
+            }
+            netPrice = base
           }
-          netPrice = base
         }
 
         const lineTotal = Number((netPrice * qty).toFixed(2))
@@ -144,7 +155,11 @@ export default async function handler(req, res) {
           quantity: qty,
           unit: item.unit || 'Pcs.',
           listPrice,
-          discountPercentage: dis,
+          discountPercentage,
+          costPrice,
+          marginPercentage,
+          discount,
+          discountType,
           price: netPrice,
           lineTotal,
         }
@@ -189,8 +204,8 @@ export default async function handler(req, res) {
         await db.execute({
           sql: `
             INSERT INTO quotation_items 
-            (quotation_id, product_id, description, quantity, unit, list_price, discount_percentage, price, line_total)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            (quotation_id, product_id, description, quantity, unit, list_price, discount_percentage, cost_price, margin_percentage, discount, discount_type, price, line_total)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
           `,
           args: [
             quotationId,
@@ -200,6 +215,10 @@ export default async function handler(req, res) {
             item.unit,
             item.listPrice,
             item.discountPercentage,
+            item.costPrice,
+            item.marginPercentage,
+            item.discount,
+            item.discountType,
             item.price,
             item.lineTotal,
           ],

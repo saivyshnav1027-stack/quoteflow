@@ -35,6 +35,7 @@ export async function initSchema() {
       list_price REAL NOT NULL DEFAULT 0.0,
       discount_percentage REAL NOT NULL DEFAULT 0.0,
       cost_price REAL NOT NULL DEFAULT 0.0,
+      margin_percentage REAL NOT NULL DEFAULT 15.0,
       stock_quantity REAL NOT NULL DEFAULT 0.0,
       created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
     )
@@ -68,12 +69,43 @@ export async function initSchema() {
       unit TEXT NOT NULL DEFAULT 'Pcs.',
       list_price REAL NOT NULL DEFAULT 0.0,
       discount_percentage REAL NOT NULL DEFAULT 0.0,
+      cost_price REAL NOT NULL DEFAULT 0.0,
+      margin_percentage REAL NOT NULL DEFAULT 0.0,
+      discount REAL NOT NULL DEFAULT 0.0,
+      discount_type TEXT NOT NULL DEFAULT 'PERCENT',
       price REAL NOT NULL DEFAULT 0.0,
       line_total REAL NOT NULL DEFAULT 0.0,
       FOREIGN KEY (quotation_id) REFERENCES quotations(id) ON DELETE CASCADE,
       FOREIGN KEY (product_id) REFERENCES products(id)
     )
   `)
+
+  // Run backward-compatible column migrations if tables existed previously
+  try {
+    await db.execute('ALTER TABLE products ADD COLUMN margin_percentage REAL NOT NULL DEFAULT 15.0')
+  } catch {
+    // column already exists
+  }
+  try {
+    await db.execute('ALTER TABLE quotation_items ADD COLUMN cost_price REAL NOT NULL DEFAULT 0.0')
+  } catch {
+    // column already exists
+  }
+  try {
+    await db.execute('ALTER TABLE quotation_items ADD COLUMN margin_percentage REAL NOT NULL DEFAULT 0.0')
+  } catch {
+    // column already exists
+  }
+  try {
+    await db.execute('ALTER TABLE quotation_items ADD COLUMN discount REAL NOT NULL DEFAULT 0.0')
+  } catch {
+    // column already exists
+  }
+  try {
+    await db.execute("ALTER TABLE quotation_items ADD COLUMN discount_type TEXT NOT NULL DEFAULT 'PERCENT'")
+  } catch {
+    // column already exists
+  }
 
   console.log('[Database] Schema initialization complete.')
 }

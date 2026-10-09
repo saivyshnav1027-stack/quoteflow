@@ -17,7 +17,7 @@ export default async function handler(req, res) {
   if (method === 'GET') {
     try {
       const result = await db.execute(`
-        SELECT id, product_code, product_name, unit, list_price, discount_percentage, cost_price, stock_quantity
+        SELECT id, product_code, product_name, unit, list_price, discount_percentage, cost_price, COALESCE(margin_percentage, 15.0) as margin_percentage, stock_quantity
         FROM products
         ORDER BY product_name ASC
       `)
@@ -37,6 +37,7 @@ export default async function handler(req, res) {
       const listPrice = Number(body.listPrice || 0)
       const discountPercentage = Number(body.discountPercentage || 0)
       let costPrice = Number(body.costPrice || 0)
+      const marginPercentage = Number(body.marginPercentage ?? body.margin_percentage ?? 15)
       const stockQuantity = Number(body.stockQuantity || 100)
 
       if (!productName) {
@@ -56,10 +57,10 @@ export default async function handler(req, res) {
       const result = await db.execute({
         sql: `
           INSERT INTO products 
-          (product_code, product_name, unit, list_price, discount_percentage, cost_price, stock_quantity)
-          VALUES (?, ?, ?, ?, ?, ?, ?)
+          (product_code, product_name, unit, list_price, discount_percentage, cost_price, margin_percentage, stock_quantity)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         `,
-        args: [productCode, productName, unit, listPrice, discountPercentage, costPrice, stockQuantity],
+        args: [productCode, productName, unit, listPrice, discountPercentage, costPrice, marginPercentage, stockQuantity],
       })
 
       const newId = Number(result.lastInsertRowid)
@@ -88,6 +89,7 @@ export default async function handler(req, res) {
       const listPrice = Number(body.listPrice || 0)
       const discountPercentage = Number(body.discountPercentage || 0)
       let costPrice = Number(body.costPrice || 0)
+      const marginPercentage = Number(body.marginPercentage ?? body.margin_percentage ?? 15)
       const stockQuantity = Number(body.stockQuantity || 0)
 
       if (costPrice <= 0 && listPrice > 0) {
@@ -101,10 +103,10 @@ export default async function handler(req, res) {
       await db.execute({
         sql: `
           UPDATE products
-          SET product_code = ?, product_name = ?, unit = ?, list_price = ?, discount_percentage = ?, cost_price = ?, stock_quantity = ?
+          SET product_code = ?, product_name = ?, unit = ?, list_price = ?, discount_percentage = ?, cost_price = ?, margin_percentage = ?, stock_quantity = ?
           WHERE id = ?
         `,
-        args: [productCode, productName, unit, listPrice, discountPercentage, costPrice, stockQuantity, id],
+        args: [productCode, productName, unit, listPrice, discountPercentage, costPrice, marginPercentage, stockQuantity, id],
       })
 
       return res.status(200).json({ success: true, message: 'Product updated successfully' })
