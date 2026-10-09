@@ -122,13 +122,15 @@ export default async function handler(req, res) {
         const listPrice = Number(item.listPrice || 0)
         const dis = Number(item.discountPercentage || 0)
 
+        // Frontend calculates the net unit price including tier markup.
+        // Recalculate accurately only if netPrice is missing or <= 0.
         let netPrice = Number(item.price)
         if (Number.isNaN(netPrice) || netPrice <= 0) {
-          netPrice = listPrice > 0 ? Number((listPrice * (1 - dis / 100)).toFixed(2)) : 0
-        }
-
-        if (markupPercentage > 0) {
-          netPrice = Number((netPrice * (1 + markupPercentage / 100)).toFixed(2))
+          let base = listPrice > 0 ? Number((listPrice * (1 - dis / 100)).toFixed(2)) : 0
+          if (markupPercentage > 0) {
+            base = Number((base * (1 + markupPercentage / 100)).toFixed(2))
+          }
+          netPrice = base
         }
 
         const lineTotal = Number((netPrice * qty).toFixed(2))
@@ -151,9 +153,26 @@ export default async function handler(req, res) {
       const total = Number(subtotal.toFixed(2))
       totalUnits = Number(totalUnits.toFixed(2))
 
-      const countRes = await db.execute('SELECT COUNT(*) as count FROM quotations')
-      const nextCount = Number(countRes.rows[0].count) + 1
-      const quotationNumber = body.quotationNumber ? String(body.quotationNumber) : `EST-${2353 + nextCount}`
+      // Find highest existing quotation number to avoid UNIQUE constraint violations
+      const quotesRes = await db.execute('SELECT quotation_number FROM quotations')
+      let maxNum = 2353
+      const existingNumbers = new Set()
+      for (const row of quotesRes.rows) {
+        const numStr = String(row.quotation_number || '')
+        existingNumbers.add(numStr)
+        const match = numStr.match(/\d+/)
+        if (match) {
+          const n = parseInt(match[0], 10)
+          if (!isNaN(n) && n > maxNum) {
+            maxNum = n
+          }
+        }
+      }
+
+      let quotationNumber = body.quotationNumber ? String(body.quotationNumber).trim() : `EST-${maxNum + 1}`
+      if (!quotationNumber || existingNumbers.has(quotationNumber)) {
+        quotationNumber = `EST-${maxNum + 1}`
+      }
 
       const quoteResult = await db.execute({
         sql: `

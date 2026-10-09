@@ -16,7 +16,6 @@ import {
   Store,
   RotateCcw,
   Database,
-  FileCheck,
   Check,
   Percent,
   Receipt,
@@ -27,7 +26,6 @@ import {
   Eye,
   EyeOff,
   Sparkles,
-  TrendingUp,
   AlertCircle,
 } from 'lucide-react'
 
@@ -272,7 +270,7 @@ function LoginScreen({ onLogin }: { onLogin: () => void }) {
             </div>
             <div className="rounded-lg bg-slate-800/50 p-2">
               <span className="font-semibold text-blue-400 block">📄 Physical Slip Ready</span>
-              <span>Kondalu #2354 Spec</span>
+              <span>Physical POS Format</span>
             </div>
           </div>
         </div>
@@ -424,7 +422,23 @@ function App() {
     try {
       const res = await fetch(`${API_BASE}/quotations`)
       const data = await res.json()
-      setQuotations(data)
+      if (Array.isArray(data)) {
+        setQuotations(data)
+        // Sync sequential estimate number to avoid duplicate key collisions
+        let maxNum = 2353
+        for (const q of data) {
+          const match = String(q.quotation_number || '').match(/\d+/)
+          if (match) {
+            const n = parseInt(match[0], 10)
+            if (!isNaN(n) && n > maxNum) {
+              maxNum = n
+            }
+          }
+        }
+        const nextNumStr = String(maxNum + 1)
+        setCurrentEstimateNo(nextNumStr)
+        localStorage.setItem('sri_current_estimate_no', nextNumStr)
+      }
     } catch (e) {
       console.error(e)
     }
@@ -461,11 +475,11 @@ function App() {
     const markup = selectedCustomer?.markup_percentage || 0
     const newRow: EstimateRow = calculateRow(
       {
-        id: Math.random().toString(36).substring(2, 9),
+        id: `${Date.now()}-${Math.floor(Math.random() * 10000)}`,
         productId: prod.id,
         productCode: prod.product_code,
         description: prod.product_name,
-        checked: true,
+        checked: false,
         quantity: 1,
         unit: prod.unit || 'Pcs.',
         listPrice: prod.list_price || 0,
@@ -480,7 +494,7 @@ function App() {
     setShowProductDropdown(false)
   }
 
-  const updateRow = (id: string, field: keyof EstimateRow, val: any) => {
+  const updateRow = (id: string, field: keyof EstimateRow, val: string | number | boolean) => {
     const markup = selectedCustomer?.markup_percentage || 0
     setEstimateRows((prev) =>
       prev.map((r) => {
@@ -524,80 +538,6 @@ function App() {
     }
   }, [estimateRows])
 
-  // Total Quoted Revenue across all saved estimates
-  const totalQuotedRevenue = useMemo(() => {
-    return quotations.reduce((sum, q) => sum + (Number(q.total) || 0), 0)
-  }, [quotations])
-
-  // Load the 26 real items from the user's uploaded slip with 1 click!
-  const loadRealReceiptItems = () => {
-    if (products.length === 0) return
-    const kondaluCust = customers.find((c) => c.customer_name.toLowerCase().includes('kondalu')) || {
-      id: 1,
-      customer_name: 'Kondalu',
-      phone: '+91 98480 12345',
-      customer_type_id: 1,
-      type_name: 'Type A (Retail Regular)',
-      markup_percentage: 0,
-    }
-    setSelectedCustomer(kondaluCust)
-
-    // Quantities matching the slip
-    const receiptQuantities: Record<string, number> = {
-      'LD 3*20 (28 de)': 40.0,
-      'Yellow Tubing Nandi Flex': 52.28,
-      'LD 3*15 (5b de)': 75.0,
-      'LD 4*15 (5b u)': 75.0,
-      'LD 4*20 (6b de)': 120.0,
-      '9" Waste Coupling': 3.0,
-      '6" Waste Coupling': 4.0,
-      '75mm Necko Clamps': 20.0,
-      '110MM NECKOCLAMPS': 20.0,
-      'Nandi 63MM Pvc Elbow (H)': 15.0,
-      'Nandi 63MM Pvc Tee (H)': 15.0,
-      'Ashirwad 3/4" CPVC PIPE SDR 13.5': 50.0,
-      'Ashirwad 1" CPVC PIPE SDR 13.5': 25.0,
-      'Ashirwad Cpvc 1" Pipe SDR11': 25.0,
-      'WC Harpan': 2.0,
-      '18*22 Steel Sink': 2.0,
-      '12*12 Beed Chamber': 3.0,
-      '24*24 FRP Chamber': 1.0,
-      'Ashirwad SWR 75mm Plain Bend': 15.0,
-      'Ashirwad SWR 75MM Nani Trap': 15.0,
-      'Ashirwad 75MM SWR Pipe': 10.0,
-      'Ashirwad 110MM SWR Pipe': 10.0,
-      'Nandi 75MM Swr Pipe': 10.0,
-      'Nandi 110MM Swr Pipe': 10.0,
-      '110MM PVC Pipe Nandi': 10.0,
-      '90MM PVC Pipe Nandi': 10.0,
-    }
-
-    setCurrentEstimateNo('2354')
-    localStorage.setItem('sri_current_estimate_no', '2354')
-
-    const prods = products.length > 0 ? products : INITIAL_PRODUCTS
-    const rows: EstimateRow[] = prods.map((p) => {
-      const qty = receiptQuantities[p.product_name] || 1
-      return calculateRow(
-        {
-          id: Math.random().toString(36).substring(2, 9),
-          productId: p.id,
-          productCode: p.product_code,
-          description: p.product_name,
-          checked: true,
-          quantity: qty,
-          unit: p.unit || 'Pcs.',
-          listPrice: p.list_price,
-          discountPercentage: p.discount_percentage,
-          price: 0,
-          lineTotal: 0,
-        },
-        0
-      )
-    })
-
-    setEstimateRows(rows)
-  }
 
   // ============================================================
   // SAVE & ACTIONS
@@ -652,17 +592,19 @@ function App() {
           items: estimateRows,
         })
 
-        // Advance to next estimate number
-        const nextNum = (parseInt(currentEstimateNo, 10) || 2354) + 1
+        // Advance to next sequential estimate number
+        const match = String(data.quotation?.quotationNumber || '').match(/\d+/)
+        const assignedNum = match ? parseInt(match[0], 10) : (parseInt(currentEstimateNo, 10) || 2354)
+        const nextNum = assignedNum + 1
         const nextStr = String(nextNum)
         setCurrentEstimateNo(nextStr)
         localStorage.setItem('sri_current_estimate_no', nextStr)
       } else {
-        alert('Failed to save quotation: ' + data.message)
+        alert('Failed to save quotation: ' + (data.message || data.error || 'Unknown error'))
       }
     } catch (err) {
       console.error(err)
-      alert('Network error saving quotation')
+      alert('Network error while saving quotation.')
     } finally {
       setIsSavingQuote(false)
     }
@@ -980,21 +922,11 @@ function App() {
         <header className="no-print sticky top-0 z-20 flex h-16 shrink-0 items-center justify-between border-b border-slate-200 bg-white/90 px-8 backdrop-blur-md">
           <div className="flex items-center gap-3">
             <span className="text-sm font-semibold text-slate-700">Wholesale Depot & Agro-Trading Hub</span>
-            <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs text-slate-500">Kondalu Slip Format</span>
+            <span className="rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-semibold text-emerald-700 border border-emerald-200/60">POS Online</span>
           </div>
 
           <div className="flex items-center gap-3">
-            <button
-              onClick={() => {
-                loadRealReceiptItems()
-                setActivePage('Estimator')
-              }}
-              className="flex items-center gap-2 rounded-xl bg-amber-50 px-3.5 py-1.5 text-xs font-bold text-amber-700 hover:bg-amber-100 transition-colors border border-amber-200 cursor-pointer"
-            >
-              <FileCheck className="h-3.5 w-3.5" />
-              <span>Load 26 Slip Items (#2354)</span>
-            </button>
-            <div className="text-xs text-slate-500">
+            <div className="text-xs font-medium text-slate-500">
               {new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
             </div>
           </div>
@@ -1250,7 +1182,7 @@ function App() {
                       {estimateRows.length === 0 ? (
                         <tr>
                           <td colSpan={10} className="py-12 text-center text-slate-400 text-sm">
-                            No items added to estimate yet. Use the search bar above or click "Load 26 Slip Items".
+                            No items added to estimate yet. Use the product search bar above to add items.
                           </td>
                         </tr>
                       ) : (
@@ -1680,163 +1612,28 @@ function App() {
               {/* Header Title */}
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
-                  <h1 className="text-2xl font-bold tracking-tight text-slate-900">Operations Dashboard</h1>
+                  <h1 className="text-2xl font-bold tracking-tight text-slate-900">Quotations & Estimates</h1>
                   <p className="mt-0.5 text-sm text-slate-500">
-                    Real-time performance overview, pricing control, and walk-in counter operations
+                    Recent estimate records and counter operations
                   </p>
                 </div>
                 <div className="flex items-center gap-2.5">
                   <button
                     onClick={() => setActivePage('Estimator')}
-                    className="flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2 text-xs font-bold text-white shadow-sm hover:bg-blue-700 transition-colors cursor-pointer"
+                    className="flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-xs font-bold text-white shadow-sm hover:bg-blue-700 transition-colors cursor-pointer"
                   >
-                    <Calculator className="h-4 w-4" />
-                    <span>Open Estimator</span>
+                    <Plus className="h-4 w-4" />
+                    <span>Create New Estimate</span>
                   </button>
-                  <button
-                    onClick={() => setShowNewProductModal(true)}
-                    className="flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors cursor-pointer"
-                  >
-                    <Plus className="h-3.5 w-3.5 text-slate-500" />
-                    <span>Add SKU</span>
-                  </button>
-                </div>
-              </div>
-
-              {/* Quick Action Hero Banner */}
-              <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-blue-700 via-blue-800 to-indigo-900 p-6 md:p-8 text-white shadow-lg">
-                <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
-                  <div>
-                    <div className="flex items-center gap-2 mb-2">
-                      <span className="rounded-full bg-blue-500/30 px-3 py-0.5 text-xs font-bold uppercase tracking-wider text-blue-200 border border-blue-400/20">
-                        Sri Venkateshwara Trading Portal
-                      </span>
-                      <span className="rounded-full bg-emerald-500/20 px-2.5 py-0.5 text-xs font-semibold text-emerald-300">
-                        Counter Ready
-                      </span>
-                    </div>
-                    <h2 className="text-2xl md:text-3xl font-extrabold tracking-tight">
-                      Ready to generate a new quotation?
-                    </h2>
-                    <p className="mt-1 text-xs md:text-sm text-blue-100 max-w-xl">
-                      Fast walk-in counter calculations with real-time discounts, tiered margins, and instant WhatsApp receipts.
-                    </p>
-                  </div>
-
-                  <div className="flex flex-wrap items-center gap-3">
-                    <button
-                      onClick={() => setActivePage('Estimator')}
-                      className="flex items-center gap-2.5 rounded-2xl bg-white px-5 py-3 text-sm font-bold text-blue-900 shadow-md hover:bg-blue-50 transition-all active:scale-95 cursor-pointer"
-                    >
-                      <Calculator className="h-5 w-5 text-blue-600" />
-                      <span>Create New Estimate</span>
-                      <ArrowRight className="h-4 w-4 text-blue-500" />
-                    </button>
-
-                    <button
-                      onClick={() => {
-                        loadRealReceiptItems()
-                        setActivePage('Estimator')
-                      }}
-                      className="flex items-center gap-2 rounded-2xl bg-blue-950/60 border border-blue-400/30 px-4 py-3 text-sm font-bold text-white hover:bg-blue-900/80 transition-all cursor-pointer"
-                    >
-                      <FileCheck className="h-4 w-4 text-amber-300" />
-                      <span>Load Kondalu Slip (#2354)</span>
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              {/* Metric Cards */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                <div className="rounded-2xl bg-white p-5 shadow-sm border border-slate-200/80">
-                  <div className="flex items-center justify-between text-slate-400 mb-2">
-                    <span className="text-xs font-bold uppercase tracking-wider">Total Quoted Value</span>
-                    <TrendingUp className="h-4 w-4 text-emerald-600" />
-                  </div>
-                  <div className="text-2xl font-bold text-slate-900">{formatINR(totalQuotedRevenue)}</div>
-                  <span className="text-xs text-emerald-600 font-semibold">{quotations.length} total receipts generated</span>
-                </div>
-
-                <div className="rounded-2xl bg-white p-5 shadow-sm border border-slate-200/80">
-                  <div className="flex items-center justify-between text-slate-400 mb-2">
-                    <span className="text-xs font-bold uppercase tracking-wider">Catalog SKUs</span>
-                    <Package className="h-4 w-4 text-blue-600" />
-                  </div>
-                  <div className="text-2xl font-bold text-slate-900">{products.length} Items</div>
-                  <span className="text-xs text-blue-600 font-semibold">Real slip inventory loaded</span>
-                </div>
-
-                <div className="rounded-2xl bg-white p-5 shadow-sm border border-slate-200/80">
-                  <div className="flex items-center justify-between text-slate-400 mb-2">
-                    <span className="text-xs font-bold uppercase tracking-wider">Active Parties</span>
-                    <Users className="h-4 w-4 text-indigo-600" />
-                  </div>
-                  <div className="text-2xl font-bold text-slate-900">{customers.length} Accounts</div>
-                  <span className="text-xs text-indigo-600 font-semibold">Tiered discount profiles</span>
-                </div>
-
-                <div className="rounded-2xl bg-white p-5 shadow-sm border border-slate-200/80">
-                  <div className="flex items-center justify-between text-slate-400 mb-2">
-                    <span className="text-xs font-bold uppercase tracking-wider">Database Mode</span>
-                    <Database className="h-4 w-4 text-slate-500" />
-                  </div>
-                  <div className="text-base font-bold text-slate-900 flex items-center gap-2">
-                    <span className="h-2.5 w-2.5 rounded-full bg-emerald-500 inline-block animate-pulse"></span>
-                    <span>{dbStatus.isUsingTurso ? 'Turso Cloud' : 'Local SQLite'}</span>
-                  </div>
-                  <span className="text-xs text-emerald-600 font-semibold">100% Offline Ready</span>
-                </div>
-              </div>
-
-              {/* Fast Module Shortcut Cards */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div 
-                  onClick={() => setActivePage('Estimator')}
-                  className="group cursor-pointer rounded-2xl bg-white p-5 shadow-sm border border-slate-200/80 hover:border-blue-500 hover:shadow-md transition-all"
-                >
-                  <div className="flex items-center justify-between mb-3">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-50 text-blue-600 group-hover:bg-blue-600 group-hover:text-white transition-colors">
-                      <Calculator className="h-5 w-5" />
-                    </div>
-                    <ArrowRight className="h-4 w-4 text-slate-400 group-hover:text-blue-600 group-hover:translate-x-1 transition-all" />
-                  </div>
-                  <h4 className="font-bold text-slate-900 text-sm">Quote Estimator (POS)</h4>
-                  <p className="text-xs text-slate-500 mt-1">Calculate slip items with unit discounts and markup</p>
-                </div>
-
-                <div 
-                  onClick={() => setActivePage('Products')}
-                  className="group cursor-pointer rounded-2xl bg-white p-5 shadow-sm border border-slate-200/80 hover:border-blue-500 hover:shadow-md transition-all"
-                >
-                  <div className="flex items-center justify-between mb-3">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-50 text-amber-600 group-hover:bg-amber-600 group-hover:text-white transition-colors">
-                      <Package className="h-5 w-5" />
-                    </div>
-                    <ArrowRight className="h-4 w-4 text-slate-400 group-hover:text-amber-600 group-hover:translate-x-1 transition-all" />
-                  </div>
-                  <h4 className="font-bold text-slate-900 text-sm">Inventory & Wholesale Catalog</h4>
-                  <p className="text-xs text-slate-500 mt-1">View list prices, trade discounts, and stock levels</p>
-                </div>
-
-                <div 
-                  onClick={() => setActivePage('Customers')}
-                  className="group cursor-pointer rounded-2xl bg-white p-5 shadow-sm border border-slate-200/80 hover:border-blue-500 hover:shadow-md transition-all"
-                >
-                  <div className="flex items-center justify-between mb-3">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600 group-hover:bg-emerald-600 group-hover:text-white transition-colors">
-                      <Users className="h-5 w-5" />
-                    </div>
-                    <ArrowRight className="h-4 w-4 text-slate-400 group-hover:text-emerald-600 group-hover:translate-x-1 transition-all" />
-                  </div>
-                  <h4 className="font-bold text-slate-900 text-sm">Party Directory & Tiers</h4>
-                  <p className="text-xs text-slate-500 mt-1">Manage regular retail, sub-dealers, and contractors</p>
                 </div>
               </div>
 
               {/* Quotations History Table */}
               <div className="rounded-2xl bg-white p-5 shadow-sm border border-slate-200/80">
-                <h3 className="text-base font-bold text-slate-900 mb-4">Recent Estimate History</h3>
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-base font-bold text-slate-900">Recent Estimate History</h3>
+                  <span className="text-xs text-slate-500 font-semibold">{quotations.length} records</span>
+                </div>
                 <div className="overflow-x-auto rounded-xl border border-slate-200">
                   <table className="w-full text-left text-xs border-collapse">
                     <thead>
@@ -1885,16 +1682,16 @@ function App() {
                                       dated: new Date(q.created_at).toLocaleDateString('en-GB'),
                                       totalUnits: q.total_units,
                                       totalAmount: q.total,
-                                      items: data.quotation.items.map((it: any) => ({
+                                      items: data.quotation.items.map((it: { id: number; product_id: number | null; description: string; quantity: number; unit?: string; list_price?: number; discount_percentage?: number; price: number; line_total: number }) => ({
                                         id: String(it.id),
                                         productId: it.product_id,
                                         productCode: '',
                                         description: it.description,
-                                        checked: true,
+                                        checked: false,
                                         quantity: it.quantity,
                                         unit: it.unit || 'Pcs.',
-                                        listPrice: it.list_price,
-                                        discountPercentage: it.discount_percentage,
+                                        listPrice: it.list_price || 0,
+                                        discountPercentage: it.discount_percentage || 0,
                                         price: it.price,
                                         lineTotal: it.line_total,
                                       })),
@@ -1994,7 +1791,7 @@ function App() {
                     <tr key={idx} className="leading-tight">
                       <td className="py-1 px-1 text-center">{idx + 1}.</td>
                       <td className="py-1 px-2 font-medium">{it.description}</td>
-                      <td className="py-1 px-1 text-center font-bold">✓</td>
+                      <td className="py-1 px-1 text-center font-mono text-[11px]">{it.checked ? '✓' : '☐'}</td>
                       <td className="py-1 px-2 text-right font-bold">{Number(it.quantity).toFixed(2)}</td>
                       <td className="py-1 px-1 text-left">{it.unit}</td>
                       <td className="py-1 px-2 text-right">{Number(it.listPrice).toFixed(2)}</td>
@@ -2160,7 +1957,15 @@ function App() {
                     required
                     placeholder="462.00"
                     value={newProdList}
-                    onChange={(e) => setNewProdList(parseFloat(e.target.value) || '')}
+                    onChange={(e) => {
+                      const val = parseFloat(e.target.value) || ''
+                      setNewProdList(val)
+                      const listNum = typeof val === 'number' ? val : 0
+                      const disNum = typeof newProdDis === 'number' ? newProdDis : 0
+                      if (listNum > 0) {
+                        setNewProdCost(Number((listNum * (1 - disNum / 100)).toFixed(2)))
+                      }
+                    }}
                     className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-500 font-bold"
                   />
                 </div>
@@ -2171,7 +1976,15 @@ function App() {
                     step="0.01"
                     placeholder="54.00"
                     value={newProdDis}
-                    onChange={(e) => setNewProdDis(parseFloat(e.target.value) || '')}
+                    onChange={(e) => {
+                      const val = parseFloat(e.target.value) || ''
+                      setNewProdDis(val)
+                      const listNum = typeof newProdList === 'number' ? newProdList : 0
+                      const disNum = typeof val === 'number' ? val : 0
+                      if (listNum > 0) {
+                        setNewProdCost(Number((listNum * (1 - disNum / 100)).toFixed(2)))
+                      }
+                    }}
                     className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-500 font-bold text-emerald-600"
                   />
                 </div>
@@ -2183,7 +1996,7 @@ function App() {
                     placeholder="Auto-calculated"
                     value={newProdCost}
                     onChange={(e) => setNewProdCost(parseFloat(e.target.value) || '')}
-                    className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-500 text-slate-500"
+                    className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-500 text-slate-700 font-semibold"
                   />
                 </div>
               </div>
@@ -2355,15 +2168,20 @@ function App() {
                   </select>
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-3 gap-3">
                 <div>
                   <label className="block text-xs font-bold text-slate-700 mb-1">List Price (₹)</label>
                   <input
                     type="number"
                     step="0.01"
                     value={editProduct.list_price}
-                    onChange={(e) => setEditProduct({ ...editProduct, list_price: parseFloat(e.target.value) || 0 })}
-                    className="w-full rounded-xl border border-slate-200 px-3.5 py-2 text-sm outline-none focus:border-blue-500 font-bold"
+                    onChange={(e) => {
+                      const list = parseFloat(e.target.value) || 0
+                      const dis = editProduct.discount_percentage || 0
+                      const cost = Number((list * (1 - dis / 100)).toFixed(2))
+                      setEditProduct({ ...editProduct, list_price: list, cost_price: cost })
+                    }}
+                    className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-500 font-bold"
                   />
                 </div>
                 <div>
@@ -2372,8 +2190,23 @@ function App() {
                     type="number"
                     step="0.01"
                     value={editProduct.discount_percentage}
-                    onChange={(e) => setEditProduct({ ...editProduct, discount_percentage: parseFloat(e.target.value) || 0 })}
-                    className="w-full rounded-xl border border-slate-200 px-3.5 py-2 text-sm outline-none focus:border-blue-500 font-bold text-emerald-600"
+                    onChange={(e) => {
+                      const dis = parseFloat(e.target.value) || 0
+                      const list = editProduct.list_price || 0
+                      const cost = Number((list * (1 - dis / 100)).toFixed(2))
+                      setEditProduct({ ...editProduct, discount_percentage: dis, cost_price: cost })
+                    }}
+                    className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-500 font-bold text-emerald-600"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">Cost Price (₹)</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={editProduct.cost_price}
+                    onChange={(e) => setEditProduct({ ...editProduct, cost_price: parseFloat(e.target.value) || 0 })}
+                    className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-500 font-bold text-slate-700"
                   />
                 </div>
               </div>

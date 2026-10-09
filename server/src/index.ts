@@ -263,8 +263,12 @@ app.put(['/api/products/:id', '/products/:id'], async (req, res) => {
     const unit = String(req.body.unit ?? 'Pcs.').trim()
     const listPrice = Number(req.body.listPrice || 0)
     const discountPercentage = Number(req.body.discountPercentage || 0)
-    const costPrice = Number(req.body.costPrice || 0)
+    let costPrice = Number(req.body.costPrice || 0)
     const stockQuantity = Number(req.body.stockQuantity || 0)
+
+    if (costPrice <= 0 && listPrice > 0) {
+      costPrice = Number((listPrice * (1 - discountPercentage / 100)).toFixed(2))
+    }
 
     if (!Number.isInteger(id)) {
       return res.status(400).json({ success: false, message: 'Invalid product ID' })
@@ -344,13 +348,15 @@ app.post(['/api/quotations', '/quotations'], async (req, res) => {
       const listPrice = Number(item.listPrice || 0)
       const dis = Number(item.discountPercentage || 0)
 
+      // Frontend calculates the net unit price including tier markup.
+      // Recalculate accurately only if netPrice is missing or <= 0.
       let netPrice = Number(item.price)
       if (Number.isNaN(netPrice) || netPrice <= 0) {
-        netPrice = listPrice > 0 ? Number((listPrice * (1 - dis / 100)).toFixed(2)) : 0
-      }
-
-      if (markupPercentage > 0) {
-        netPrice = Number((netPrice * (1 + markupPercentage / 100)).toFixed(2))
+        let base = listPrice > 0 ? Number((listPrice * (1 - dis / 100)).toFixed(2)) : 0
+        if (markupPercentage > 0) {
+          base = Number((base * (1 + markupPercentage / 100)).toFixed(2))
+        }
+        netPrice = base
       }
 
       const lineTotal = Number((netPrice * qty).toFixed(2))
@@ -374,10 +380,26 @@ app.post(['/api/quotations', '/quotations'], async (req, res) => {
     totalUnits = Number(totalUnits.toFixed(2))
 
     const now = new Date()
-    const dateStr = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}`
-    const countRes = await db.execute('SELECT COUNT(*) as count FROM quotations')
-    const nextCount = Number(countRes.rows[0].count) + 1
-    const quotationNumber = req.body.quotationNumber ? String(req.body.quotationNumber) : `EST-${2353 + nextCount}`
+    // Find highest existing quotation number to avoid UNIQUE constraint collisions
+    const quotesRes = await db.execute('SELECT quotation_number FROM quotations')
+    let maxNum = 2353
+    const existingNumbers = new Set()
+    for (const row of quotesRes.rows) {
+      const numStr = String(row.quotation_number || '')
+      existingNumbers.add(numStr)
+      const match = numStr.match(/\d+/)
+      if (match) {
+        const n = parseInt(match[0], 10)
+        if (!isNaN(n) && n > maxNum) {
+          maxNum = n
+        }
+      }
+    }
+
+    let quotationNumber = req.body.quotationNumber ? String(req.body.quotationNumber).trim() : `EST-${maxNum + 1}`
+    if (!quotationNumber || existingNumbers.has(quotationNumber)) {
+      quotationNumber = `EST-${maxNum + 1}`
+    }
 
     const quoteResult = await db.execute({
       sql: `

@@ -1,0 +1,4 @@
+node_modules/
+dist/
+.git/
+stitch_rural_trading_quote_estimator/

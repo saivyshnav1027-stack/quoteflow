@@ -87,8 +87,12 @@ export default async function handler(req, res) {
       const unit = String(body.unit ?? 'Pcs.').trim()
       const listPrice = Number(body.listPrice || 0)
       const discountPercentage = Number(body.discountPercentage || 0)
-      const costPrice = Number(body.costPrice || 0)
+      let costPrice = Number(body.costPrice || 0)
       const stockQuantity = Number(body.stockQuantity || 0)
+
+      if (costPrice <= 0 && listPrice > 0) {
+        costPrice = Number((listPrice * (1 - discountPercentage / 100)).toFixed(2))
+      }
 
       if (!id) {
         return res.status(400).json({ success: false, message: 'Invalid product ID' })

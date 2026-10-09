@@ -9,6 +9,7 @@ A comprehensive technical reference and flow documentation for the **QuoteFlow**
 **QuoteFlow** is a specialized B2B/B2C quotation and billing management application. It enables businesses to manage customers, track inventory/products, configure customer tier markups, and rapidly generate dynamic quotations with automated price calculations.
 
 ### Core Value Proposition
+
 - **Automated Tiered Pricing:** Eliminates manual calculations by dynamically computing markups based on customer classification (e.g., Type A = 3%, Type E = 30%).
 - **Historical Snapshotting:** Locks prices, markup percentages, and cost calculations into historical records at the moment a quote is generated, ensuring future price or tier changes do not alter past quotes.
 - **Fast Quotation Generation:** Interactive builder with real-time price preview and instant sequential quotation numbering (`QT-YYYYMMDD-XXX`).
@@ -19,7 +20,7 @@ A comprehensive technical reference and flow documentation for the **QuoteFlow**
 
 QuoteFlow uses a decoupled client-server architecture:
 
-```
+```text
 +-------------------------------------------------------------------------+
 |                              FRONTEND                                   |
 |   React 19 + TypeScript + Vite + Tailwind CSS v4 + Lucide Icons         |
@@ -51,7 +52,7 @@ QuoteFlow uses a decoupled client-server architecture:
 ### Technology Stack Summary
 
 | Layer | Technologies | Purpose |
-|---|---|---|
+| --- | --- | --- |
 | **Frontend** | React 19, TypeScript, Vite 8, Tailwind CSS v4, Lucide React | Single-page UI, live pricing calculator, dashboard, and modals |
 | **Backend** | Node.js, Express 5, TypeScript (`tsx`), CORS, Dotenv | RESTful API endpoints, request validation, business rules |
 | **Database** | LibSQL (`@libsql/client`), Turso Cloud / SQLite | Relational persistence with foreign keys and auto-incrementing IDs |
@@ -120,14 +121,18 @@ erDiagram
 ### Table Definitions & Key Attributes
 
 #### 1. `customer_types`
+
 Defines customer tiers and their corresponding baseline markup percentages.
+
 - `id`: Primary key (autoincrement).
 - `type_name`: Unique name (e.g., `Type A`, `Type B`, `Type C`, `Type D`, `Type E`).
 - `markup_percentage`: Floating point markup rate (e.g., `3.0`, `10.0`, `30.0`).
 - `created_at`: Creation timestamp.
 
 #### 2. `customers`
+
 Stores client details and links each client to a pricing tier.
+
 - `id`: Primary key (autoincrement).
 - `customer_name`: Name or company name.
 - `phone`: Contact telephone number.
@@ -135,7 +140,9 @@ Stores client details and links each client to a pricing tier.
 - `created_at`: Creation timestamp.
 
 #### 3. `products`
+
 Inventory and catalog table.
+
 - `id`: Primary key (autoincrement).
 - `product_code`: Unique SKU/identifier (e.g., `PROD001`).
 - `product_name`: Descriptive item title.
@@ -144,7 +151,9 @@ Inventory and catalog table.
 - `created_at`: Creation timestamp.
 
 #### 4. `quotations`
+
 Master quotation header record.
+
 - `id`: Primary key (autoincrement).
 - `quotation_number`: Unique sequential formatted number (`QT-YYYYMMDD-XXX`).
 - `customer_id`: Foreign Key referencing `customers(id)`.
@@ -155,7 +164,9 @@ Master quotation header record.
 - `created_at`: Creation timestamp.
 
 #### 5. `quotation_items`
+
 Individual line items linked to a parent quotation.
+
 - `id`: Primary key (autoincrement).
 - `quotation_id`: Foreign Key referencing `quotations(id)`.
 - `product_id`: Foreign Key referencing `products(id)`.
@@ -183,7 +194,8 @@ $$\text{subtotal} = \sum_{i=1}^{n} \text{lineTotal}_i$$
 
 $$\text{total} = \text{subtotal} \quad \text{(V1 baseline)}$$
 
-#### Concrete Calculation Example:
+#### Concrete Calculation Example
+
 - **Customer:** Jane Doe (`customer_type_id`: Type C = 10% markup)
 - **Item 1:** Industrial Valve (`cost_price`: $100.00, `quantity`: 2)
   - $\text{markupAmount} = \$100.00 \times 0.10 = \$10.00$
@@ -196,7 +208,9 @@ $$\text{total} = \text{subtotal} \quad \text{(V1 baseline)}$$
 - **Total Quotation Amount:** $\$220.00 + \$110.00 = \$330.00$
 
 ### Quotation Number Generation Strategy
+
 Quotations use a predictable business sequence:
+
 1. Current date formatted as `YYYYMMDD` (e.g. `20260926`).
 2. Current count of records in `quotations` table incremented by 1:
    $$\text{quotationCount} = (\text{COUNT(*) FROM quotations}) + 1$$
@@ -210,7 +224,7 @@ Quotations use a predictable business sequence:
 
 The backend Express application (`server/src/index.ts`) handles 6 core operational flows:
 
-```
+```text
                                 Backend Flows
                                       |
      +----------------+---------------+----------------+----------------+
@@ -269,7 +283,8 @@ sequenceDiagram
     API-->>Client: 201 Created { success: true, quotation: { ... } }
 ```
 
-#### Step-by-Step Flow Explanation:
+#### Step-by-Step Flow Explanation
+
 1. **Request Payload Ingestion:** Frontend sends `POST /api/quotations` with `customerId` and an array of `{ productId, quantity }`.
 2. **Structural Validation:**
    - Checks if `customerId` is an integer.
@@ -375,7 +390,7 @@ flowchart TD
 ## 6. Complete API Specification
 
 | Route | Method | Request Body | Response (Success) | Status Codes | Description |
-|---|---|---|---|---|---|
+| --- | --- | --- | --- | --- | --- |
 | `/api/test-db` | `GET` | *None* | `{ success: true, message, result }` | 200, 500 | Health check for Turso/SQLite DB |
 | `/api/customer-types` | `GET` | *None* | `[ { id, type_name, markup_percentage } ]` | 200, 500 | Fetch all customer tiers |
 | `/api/customer-types/:id` | `PUT` | `{ markup: number }` | `{ success: true, customerType }` | 200, 400, 500 | Update markup percentage for tier |
@@ -395,16 +410,18 @@ flowchart TD
 The frontend is implemented in `src/App.tsx` as a responsive Single Page Application (SPA).
 
 ### Main Navigation Pages
+
 1. **Dashboard:** KPI summary cards showing count of customers, products, and customer types, with quick links.
 2. **Customers:** Data table with customer list, tier tags, and interactive Add/Edit modal dialogs.
 3. **Products:** Inventory catalog showing codes, cost prices, stock quantities, and Add/Edit modal dialogs.
 4. **Customer Types:** Tier matrix displaying Type A–E with their respective markup rates, allowing direct edits.
-5. **Quotations:** 
+5. **Quotations:**
    - **Interactive Quote Generator:** Customer selection dropdown, multi-item line builder with live unit price, markup calculation, and line total preview.
    - **Quotation History Table:** Audit trail of generated quotations with dates, numbers, customer names, and final totals.
 6. **Settings:** Application settings and connection state placeholder.
 
 ### Frontend Calculation Synchronization
+
 The frontend mirrors the backend's pricing formula in real-time within the UI before submission, allowing users to see exact markups, unit prices, and running totals as they select products and adjust quantities.
 
 ---
@@ -414,7 +431,7 @@ The frontend mirrors the backend's pricing formula in real-time within the UI be
 The project includes standalone setup scripts in `server/src/` to initialize tables and seed baseline data:
 
 | Script | Command | Purpose |
-|---|---|---|
+| --- | --- | --- |
 | `server/src/setup-db.ts` | `npx tsx server/src/setup-db.ts` | Creates `customer_types` table and seeds default tiers (Type A: 3%, B: 5%, C: 10%, D: 20%, E: 30%) |
 | `server/src/setup-customers.ts` | `npx tsx server/src/setup-customers.ts` | Creates `customers` table with foreign key to `customer_types` |
 | `server/src/setup-products.ts` | `npx tsx server/src/setup-products.ts` | Creates `products` table with unique constraint on `product_code` |
