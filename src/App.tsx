@@ -1906,88 +1906,90 @@ function App() {
               </div>
             </div>
 
-            {/* PHYSICAL RECEIPT REPRODUCTION CONTAINER */}
-            <div id="printable-estimate-slip" className="border border-slate-400 p-4 font-mono text-[11px] text-black">
-              {/* Header Box */}
-              <div className="flex justify-between items-start border-b border-slate-400 pb-2">
-                <div className="space-y-1">
-                  <div className="text-xs font-bold uppercase">Sri Venkateshwara Trading & Co.</div>
-                  <div>
-                    Party Details : <b>{printQuoteData.partyName}</b>
-                  </div>
-                  {printQuoteData.phone && <div>Phone : {printQuoteData.phone}</div>}
+            {/* PHYSICAL RECEIPT REPRODUCTION CONTAINER (MATCHING PHYSICAL PRINTED SLIP) */}
+            <div id="printable-estimate-slip" className="border border-black p-5 font-sans text-black bg-white">
+              {/* Top Om Symbol & ESTIMATE title */}
+              <div className="flex flex-col items-center justify-center text-center pb-2">
+                <div className="text-3xl font-bold leading-none select-none">ॐ</div>
+                <div className="text-sm font-black tracking-widest uppercase mt-0.5">ESTIMATE</div>
+              </div>
+
+              {/* Header Box: Shop details & Date */}
+              <div className="flex justify-between items-start text-xs font-semibold pt-1 pb-2">
+                <div>
+                  <div className="font-bold text-sm tracking-tight uppercase">SRI VENKATESHWARA AND COMPANY</div>
+                  <div className="uppercase text-slate-800">JAMMIKUNTA</div>
+                  {printQuoteData.partyName && (
+                    <div className="mt-1 text-[11px] text-slate-700">
+                      Party : <span className="font-bold">{printQuoteData.partyName}</span>
+                      {printQuoteData.phone && <span className="ml-1.5 font-normal">({printQuoteData.phone})</span>}
+                    </div>
+                  )}
                 </div>
-                <div className="text-center">
-                  <div className="text-base font-bold uppercase tracking-wider">ESTIMATION</div>
-                  <div className="text-[10px] italic">Original Copy</div>
-                </div>
-                <div className="text-right space-y-1">
-                  <div>
-                    Invoice No. : <b>{printQuoteData.invoiceNo}</b>
-                  </div>
-                  <div>Dated : {printQuoteData.dated}</div>
+                <div className="text-right">
+                  <div className="font-bold">{printQuoteData.dated}</div>
+                  {printQuoteData.invoiceNo && (
+                    <div className="text-[11px] text-slate-700 mt-0.5">
+                      No : <span className="font-bold">{printQuoteData.invoiceNo}</span>
+                    </div>
+                  )}
                 </div>
               </div>
 
-              {/* Items Grid */}
-              <table className="w-full mt-3 border-collapse text-[10px]">
+              {/* Grid Table matching exact physical layout */}
+              <table className="w-full border-collapse border border-black text-xs mt-1">
                 <thead>
-                  <tr className="border-b border-t border-slate-400 font-bold uppercase">
-                    <th className="py-1 px-1 text-center w-8">S.N.</th>
-                    <th className="py-1 px-2 text-left">Description of Goods</th>
-                    <th className="py-1 px-1 text-center w-8">Chek</th>
-                    <th className="py-1 px-2 text-right w-16">Qty.</th>
-                    <th className="py-1 px-1 text-left w-10">Unit</th>
-                    {enableListPriceMode && (
-                      <>
-                        <th className="py-1 px-2 text-right w-16">List</th>
-                        <th className="py-1 px-1 text-right w-12">Dis%</th>
-                      </>
-                    )}
-                    <th className="py-1 px-2 text-right w-16">Price</th>
-                    <th className="py-1 px-2 text-right w-20">Amount(₹)</th>
+                  <tr className="border-b border-black font-bold uppercase text-[11px] bg-slate-50/50">
+                    <th className="border border-black py-1 px-1.5 text-center w-10">S.No</th>
+                    <th className="border border-black py-1 px-2.5 text-left">Product</th>
+                    <th className="border border-black py-1 px-2 text-center w-24">Qty</th>
+                    <th className="border border-black py-1 px-2 text-right w-20">Rate</th>
+                    <th className="border border-black py-1 px-2 text-right w-24">Amt</th>
+                    <th className="border border-black py-1 px-1 text-center w-12">Chk</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-200">
+                <tbody>
                   {printQuoteData.items.map((it, idx) => (
-                    <tr key={idx} className="leading-tight">
-                      <td className="py-1 px-1 text-center">{idx + 1}.</td>
-                      <td className="py-1 px-2 font-medium">{it.description}</td>
-                      <td className="py-1 px-1 text-center font-mono text-[11px]">{it.checked ? '✓' : '☐'}</td>
-                      <td className="py-1 px-2 text-right font-bold">{Number(it.quantity).toFixed(2)}</td>
-                      <td className="py-1 px-1 text-left">{it.unit}</td>
-                      {enableListPriceMode && (
-                        <>
-                          <td className="py-1 px-2 text-right">{Number(it.listPrice).toFixed(2)}</td>
-                          <td className="py-1 px-1 text-right">{Number(it.discountPercentage).toFixed(2)}</td>
-                        </>
-                      )}
-                      <td className="py-1 px-2 text-right font-semibold">{Number(it.price).toFixed(2)}</td>
-                      <td className="py-1 px-2 text-right font-bold">{Number(it.lineTotal).toFixed(2)}</td>
+                    <tr key={idx} className="border-b border-black">
+                      <td className="border border-black py-1 px-1 text-center font-medium">{idx + 1}</td>
+                      <td className="border border-black py-1 px-2.5 font-semibold text-slate-900">{it.description}</td>
+                      <td className="border border-black py-1 px-2 text-center whitespace-nowrap font-medium">
+                        {Number(it.quantity)} {it.unit || 'No'}
+                      </td>
+                      <td className="border border-black py-1 px-2 text-right font-medium">
+                        {Number(it.price).toFixed(2)}
+                      </td>
+                      <td className="border border-black py-1 px-2 text-right font-bold">
+                        {Number(it.lineTotal).toFixed(2)}
+                      </td>
+                      <td className="border border-black py-1 px-1 text-center">
+                        <div className="inline-block h-4 w-4 border border-black rounded-[2px]" />
+                      </td>
                     </tr>
                   ))}
                 </tbody>
                 <tfoot>
-                  <tr className="border-t-2 border-slate-400 font-bold">
-                    <td colSpan={3} className="py-2 px-2 text-left uppercase">
-                      Totals c/o
+                  <tr className="border-t-2 border-black font-bold bg-slate-50/30">
+                    <td colSpan={2} className="border border-black py-1.5 px-2.5 text-left uppercase">
+                      Total
                     </td>
-                    <td colSpan={2} className="py-2 px-2 text-left font-black">
+                    <td className="border border-black py-1.5 px-2 text-center font-black">
                       {printQuoteData.totalUnits.toFixed(2)} Units
                     </td>
-                    <td colSpan={enableListPriceMode ? 3 : 1} className="py-2 px-2 text-right uppercase">
-                      Total:
+                    <td className="border border-black py-1.5 px-2 text-right uppercase text-[10px]">
+                      Net Total:
                     </td>
-                    <td className="py-2 px-2 text-right font-black text-sm">
+                    <td className="border border-black py-1.5 px-2 text-right font-black text-sm">
                       {Number(printQuoteData.totalAmount).toFixed(2)}
                     </td>
+                    <td className="border border-black py-1.5 px-1 text-center" />
                   </tr>
                 </tfoot>
               </table>
 
-              <div className="mt-6 flex justify-between items-end text-[9px] text-slate-500 pt-4 border-t border-slate-300">
+              <div className="mt-3 flex justify-between items-end text-[10px] text-slate-600 pt-2 border-t border-slate-300">
                 <div>* Estimates are valid for 3 working days from date of issue.</div>
-                <div className="text-right">For Sri Venkateshwara Trading & Co.</div>
+                <div className="text-right font-semibold">For Sri Venkateshwara And Company</div>
               </div>
             </div>
           </div>
