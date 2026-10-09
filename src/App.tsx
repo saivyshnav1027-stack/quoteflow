@@ -1938,8 +1938,12 @@ function App() {
                     <th className="py-1 px-1 text-center w-8">Chek</th>
                     <th className="py-1 px-2 text-right w-16">Qty.</th>
                     <th className="py-1 px-1 text-left w-10">Unit</th>
-                    <th className="py-1 px-2 text-right w-16">List</th>
-                    <th className="py-1 px-1 text-right w-12">Dis%</th>
+                    {enableListPriceMode && (
+                      <>
+                        <th className="py-1 px-2 text-right w-16">List</th>
+                        <th className="py-1 px-1 text-right w-12">Dis%</th>
+                      </>
+                    )}
                     <th className="py-1 px-2 text-right w-16">Price</th>
                     <th className="py-1 px-2 text-right w-20">Amount(₹)</th>
                   </tr>
@@ -1952,8 +1956,12 @@ function App() {
                       <td className="py-1 px-1 text-center font-mono text-[11px]">{it.checked ? '✓' : '☐'}</td>
                       <td className="py-1 px-2 text-right font-bold">{Number(it.quantity).toFixed(2)}</td>
                       <td className="py-1 px-1 text-left">{it.unit}</td>
-                      <td className="py-1 px-2 text-right">{Number(it.listPrice).toFixed(2)}</td>
-                      <td className="py-1 px-1 text-right">{Number(it.discountPercentage).toFixed(2)}</td>
+                      {enableListPriceMode && (
+                        <>
+                          <td className="py-1 px-2 text-right">{Number(it.listPrice).toFixed(2)}</td>
+                          <td className="py-1 px-1 text-right">{Number(it.discountPercentage).toFixed(2)}</td>
+                        </>
+                      )}
                       <td className="py-1 px-2 text-right font-semibold">{Number(it.price).toFixed(2)}</td>
                       <td className="py-1 px-2 text-right font-bold">{Number(it.lineTotal).toFixed(2)}</td>
                     </tr>
@@ -1967,7 +1975,7 @@ function App() {
                     <td colSpan={2} className="py-2 px-2 text-left font-black">
                       {printQuoteData.totalUnits.toFixed(2)} Units
                     </td>
-                    <td colSpan={3} className="py-2 px-2 text-right uppercase">
+                    <td colSpan={enableListPriceMode ? 3 : 1} className="py-2 px-2 text-right uppercase">
                       Total:
                     </td>
                     <td className="py-2 px-2 text-right font-black text-sm">
