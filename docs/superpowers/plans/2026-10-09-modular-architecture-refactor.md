@@ -159,22 +159,22 @@
   export const AdminSettingsView: React.FC<AdminSettingsViewProps>
   ```
 
-- [ ] **Step 1: Create `Sidebar.tsx`**
+- [x] **Step 1: Create `Sidebar.tsx`**
   Extract navigation sidebar, brand card, and Turso Cloud DB status indicator.
 
-- [ ] **Step 2: Create `DashboardView.tsx`**
+- [x] **Step 2: Create `DashboardView.tsx`**
   Extract recent quotation history table and quick action cards.
 
-- [ ] **Step 3: Create `EstimatorView.tsx`**
+- [x] **Step 3: Create `EstimatorView.tsx`**
   Extract customer selector, product search bar, and estimate item table.
 
-- [ ] **Step 4: Create `AdminSettingsView.tsx`**
+- [x] **Step 4: Create `AdminSettingsView.tsx`**
   Extract feature flag toggles (List Price mode, Flat Rupee discount).
 
-- [ ] **Step 5: Verify build**
+- [x] **Step 5: Verify build**
   Run: `npm run build`
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
   ```bash
   git add src/components/Layout/ src/components/Dashboard/ src/components/Estimator/ src/components/Settings/
   git commit -m "refactor: extract Sidebar, Dashboard, Estimator, and AdminSettings views"
@@ -187,23 +187,23 @@
 **Files:**
 - Modify: `src/App.tsx` (Reduce from 2,400 lines to ~150 lines)
 
-- [ ] **Step 1: Assemble clean `App.tsx`**
+- [x] **Step 1: Assemble clean `App.tsx`**
   Import extracted components, shared state, and loaders into `App.tsx`.
   Remove duplicated inline functions and unused code.
 
-- [ ] **Step 2: Run test suite**
+- [x] **Step 2: Run test suite**
   Run: `npm test`
   Verify all unit tests pass.
 
-- [ ] **Step 3: Run linter and build**
+- [x] **Step 3: Run linter and build**
   Run: `npm run lint && npm run build`
   Verify 0 errors.
 
-- [ ] **Step 4: Run Playwright E2E browser test**
+- [x] **Step 4: Run Playwright E2E browser test**
   Run: `node scratch/playwright_e2e.cjs`
   Confirm all UI flows (login, customer, product, estimator, save, slip) work identically.
 
-- [ ] **Step 5: Commit and Deploy to PROD**
+- [x] **Step 5: Commit and Deploy to PROD**
   ```bash
   git add src/App.tsx
   git commit -m "refactor: streamline App.tsx root component"
