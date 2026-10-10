@@ -33,4 +33,9 @@ dist-ssr
 
 # Stitch UI designs
 stitch_rural_trading_quote_estimator/
+
+# Handoff Documentation (Never commit to git)
+HANDOFF.md
+handoff.md
+
 

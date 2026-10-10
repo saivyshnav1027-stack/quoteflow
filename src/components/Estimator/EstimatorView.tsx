@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useRef, useEffect } from 'react'
 import {
   Receipt,
   Plus,
@@ -77,6 +77,40 @@ export const EstimatorView: React.FC<EstimatorViewProps> = ({
   const [productSearch, setProductSearch] = useState('')
   const [showProductDropdown, setShowProductDropdown] = useState(false)
 
+  const customerContainerRef = useRef<HTMLDivElement>(null)
+  const productContainerRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (
+        customerContainerRef.current &&
+        !customerContainerRef.current.contains(e.target as Node)
+      ) {
+        setShowCustomerDropdown(false)
+      }
+      if (
+        productContainerRef.current &&
+        !productContainerRef.current.contains(e.target as Node)
+      ) {
+        setShowProductDropdown(false)
+      }
+    }
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setShowCustomerDropdown(false)
+        setShowProductDropdown(false)
+      }
+    }
+
+    document.addEventListener('mousedown', handleClickOutside)
+    document.addEventListener('keydown', handleKeyDown)
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+      document.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [])
+
   const filteredCustomers = customers.filter(
     (c) =>
       c.customer_name.toLowerCase().includes(customerSearch.toLowerCase()) ||
@@ -119,7 +153,7 @@ export const EstimatorView: React.FC<EstimatorViewProps> = ({
       <div className="relative rounded-2xl bg-white p-5 shadow-sm border border-slate-200/80">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
           {/* Customer Search / Picker */}
-          <div className="relative flex-1">
+          <div ref={customerContainerRef} className="relative flex-1">
             <div className="relative">
               <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
               <input
@@ -131,38 +165,66 @@ export const EstimatorView: React.FC<EstimatorViewProps> = ({
                   setShowCustomerDropdown(true)
                 }}
                 onFocus={() => setShowCustomerDropdown(true)}
-                className="w-full rounded-xl border border-slate-200 bg-slate-50 pl-10 pr-4 py-2.5 text-sm text-slate-900 placeholder-slate-400 outline-none focus:border-blue-500 focus:bg-white focus:ring-2 focus:ring-blue-100 transition-all"
+                className="w-full rounded-xl border border-slate-200 bg-slate-50 pl-10 pr-10 py-2.5 text-sm text-slate-900 placeholder-slate-400 outline-none focus:border-blue-500 focus:bg-white focus:ring-2 focus:ring-blue-100 transition-all"
               />
+              {(customerSearch || showCustomerDropdown) && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCustomerSearch('')
+                    setShowCustomerDropdown(false)
+                  }}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 rounded-lg p-1 text-slate-400 hover:bg-slate-200 hover:text-slate-600 cursor-pointer"
+                  title="Close dropdown / clear search"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              )}
             </div>
 
-            {/* Customer Dropdown */}
+            {/* Customer Dropdown (calibrated to ~5 items visible with smooth scroll) */}
             {showCustomerDropdown && (
-              <div className="absolute left-0 right-0 top-12 z-30 max-h-60 overflow-y-auto rounded-xl border border-slate-200 bg-white p-1.5 shadow-xl">
-                {filteredCustomers.length === 0 ? (
-                  <div className="p-3 text-center text-xs text-slate-400">
-                    No matching customers found
-                  </div>
-                ) : (
-                  filteredCustomers.map((c) => (
-                    <button
-                      key={c.id}
-                      onClick={() => {
-                        onSelectCustomer(c)
-                        setShowCustomerDropdown(false)
-                        setCustomerSearch('')
-                      }}
-                      className="flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm hover:bg-slate-50 transition-colors cursor-pointer"
-                    >
-                      <div className="flex flex-col">
-                        <span className="font-semibold text-slate-800">{c.customer_name}</span>
-                        <span className="text-xs text-slate-400">{c.phone || 'No phone'}</span>
-                      </div>
-                      <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-[11px] font-semibold text-slate-600">
-                        #{c.id}
-                      </span>
-                    </button>
-                  ))
-                )}
+              <div className="absolute left-0 right-0 top-12 z-30 max-h-[250px] overflow-y-auto rounded-xl border border-slate-200 bg-white shadow-xl flex flex-col">
+                <div className="sticky top-0 z-10 flex items-center justify-between border-b border-slate-100 bg-slate-50/95 px-3 py-1.5 backdrop-blur-sm">
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                    Customers ({filteredCustomers.length})
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setShowCustomerDropdown(false)}
+                    className="flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] font-semibold text-slate-500 hover:bg-slate-200 hover:text-slate-800 cursor-pointer"
+                  >
+                    <span>Close</span>
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+                <div className="p-1">
+                  {filteredCustomers.length === 0 ? (
+                    <div className="p-3 text-center text-xs text-slate-400">
+                      No matching customers found
+                    </div>
+                  ) : (
+                    filteredCustomers.map((c) => (
+                      <button
+                        key={c.id}
+                        onClick={() => {
+                          onSelectCustomer(c)
+                          setShowCustomerDropdown(false)
+                          setCustomerSearch('')
+                        }}
+                        className="flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm hover:bg-slate-50 transition-colors cursor-pointer"
+                      >
+                        <div className="flex flex-col">
+                          <span className="font-semibold text-slate-800">{c.customer_name}</span>
+                          <span className="text-xs text-slate-400">{c.phone || 'No phone'}</span>
+                        </div>
+                        <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-[11px] font-semibold text-slate-600">
+                          #{c.id}
+                        </span>
+                      </button>
+                    ))
+                  )}
+                </div>
               </div>
             )}
           </div>
@@ -223,94 +285,124 @@ export const EstimatorView: React.FC<EstimatorViewProps> = ({
       {/* Section B: Product Search Bar */}
       <div className="rounded-2xl bg-white p-5 shadow-sm border border-slate-200/80 space-y-4">
         <div className="flex flex-col sm:flex-row items-center gap-3">
-          <div className="relative flex-1 w-full">
-            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-            <input
-              type="text"
-              placeholder="Type product name, pipe size, clamp or code (e.g. CPVC, Ashirwad, Nandi, FRP)..."
-              value={productSearch}
-              onChange={(e) => {
-                setProductSearch(e.target.value)
-                setShowProductDropdown(true)
-              }}
-              onFocus={() => setShowProductDropdown(true)}
-              className="w-full rounded-xl border border-slate-200 bg-slate-50 pl-10 pr-4 py-2.5 text-sm text-slate-900 placeholder-slate-400 outline-none focus:border-blue-500 focus:bg-white focus:ring-2 focus:ring-blue-100 transition-all"
-            />
+          <div ref={productContainerRef} className="relative flex-1 w-full">
+            <div className="relative">
+              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+              <input
+                type="text"
+                placeholder="Type product name, pipe size, clamp or code (e.g. CPVC, Ashirwad, Nandi, FRP)..."
+                value={productSearch}
+                onChange={(e) => {
+                  setProductSearch(e.target.value)
+                  setShowProductDropdown(true)
+                }}
+                onFocus={() => setShowProductDropdown(true)}
+                className="w-full rounded-xl border border-slate-200 bg-slate-50 pl-10 pr-10 py-2.5 text-sm text-slate-900 placeholder-slate-400 outline-none focus:border-blue-500 focus:bg-white focus:ring-2 focus:ring-blue-100 transition-all"
+              />
+              {(productSearch || showProductDropdown) && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setProductSearch('')
+                    setShowProductDropdown(false)
+                  }}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 rounded-lg p-1 text-slate-400 hover:bg-slate-200 hover:text-slate-600 cursor-pointer"
+                  title="Close dropdown / clear search"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              )}
+            </div>
 
-            {/* Product Dropdown */}
+            {/* Product Dropdown (calibrated to ~5 items visible with smooth scroll) */}
             {showProductDropdown && (
-              <div className="absolute left-0 right-0 top-12 z-30 max-h-72 overflow-y-auto rounded-xl border border-slate-200 bg-white p-2 shadow-xl">
-                {filteredProducts.length === 0 ? (
-                  <div className="p-4 text-center">
-                    <p className="text-xs text-slate-500 mb-2">
-                      "{productSearch}" is not in inventory.
-                    </p>
-                    <button
-                      onClick={() => {
-                        onAddNewProductClick(productSearch)
-                        setShowProductDropdown(false)
-                      }}
-                      className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-blue-700 cursor-pointer"
-                    >
-                      + Add "{productSearch}" to Inventory
-                    </button>
-                  </div>
-                ) : (
-                  <>
-                    {filteredProducts.map((p) => (
-                      <button
-                        key={p.id}
-                        onClick={() => {
-                          onAddProductToEstimate(p)
-                          setProductSearch('')
-                          setShowProductDropdown(false)
-                        }}
-                        className="flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm hover:bg-blue-50 transition-colors cursor-pointer"
-                      >
-                        <div className="flex flex-col">
-                          <span className="font-semibold text-slate-800">{p.product_name}</span>
-                          <span className="text-xs text-slate-400">
-                            Code: {p.product_code} | Unit: {p.unit}
-                          </span>
-                        </div>
-                        <div className="flex flex-col items-end">
-                          {enableListPriceMode ? (
-                            <>
-                              <span className="font-bold text-slate-900">
-                                List: {formatINR(p.list_price)}
-                              </span>
-                              {p.discount_percentage > 0 && (
-                                <span className="text-xs text-emerald-600 font-semibold">
-                                  Dis: {p.discount_percentage}%
-                                </span>
-                              )}
-                            </>
-                          ) : (
-                            <>
-                              <span className="font-bold text-slate-900">
-                                Cost: {formatINR(p.cost_price)}
-                              </span>
-                              <span className="text-xs text-blue-600 font-semibold">
-                                Margin: {p.margin_percentage ?? 15}%
-                              </span>
-                            </>
-                          )}
-                        </div>
-                      </button>
-                    ))}
-                    <div className="mt-1 border-t border-slate-100 pt-1 text-center">
+              <div className="absolute left-0 right-0 top-12 z-30 max-h-[260px] overflow-y-auto rounded-xl border border-slate-200 bg-white shadow-xl flex flex-col">
+                <div className="sticky top-0 z-10 flex items-center justify-between border-b border-slate-100 bg-slate-50/95 px-3 py-1.5 backdrop-blur-sm">
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                    Inventory Items ({filteredProducts.length})
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setShowProductDropdown(false)}
+                    className="flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] font-semibold text-slate-500 hover:bg-slate-200 hover:text-slate-800 cursor-pointer"
+                  >
+                    <span>Close</span>
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+                <div className="p-1">
+                  {filteredProducts.length === 0 ? (
+                    <div className="p-4 text-center">
+                      <p className="text-xs text-slate-500 mb-2">
+                        "{productSearch}" is not in inventory.
+                      </p>
                       <button
                         onClick={() => {
                           onAddNewProductClick(productSearch)
                           setShowProductDropdown(false)
                         }}
-                        className="text-xs font-bold text-blue-600 hover:underline py-1 cursor-pointer"
+                        className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-blue-700 cursor-pointer"
                       >
-                        + Add Custom / Unlisted Product to Catalog
+                        + Add "{productSearch}" to Inventory
                       </button>
                     </div>
-                  </>
-                )}
+                  ) : (
+                    <>
+                      {filteredProducts.map((p) => (
+                        <button
+                          key={p.id}
+                          onClick={() => {
+                            onAddProductToEstimate(p)
+                            setProductSearch('')
+                            setShowProductDropdown(false)
+                          }}
+                          className="flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm hover:bg-blue-50 transition-colors cursor-pointer"
+                        >
+                          <div className="flex flex-col">
+                            <span className="font-semibold text-slate-800">{p.product_name}</span>
+                            <span className="text-xs text-slate-400">
+                              Code: {p.product_code} | Unit: {p.unit}
+                            </span>
+                          </div>
+                          <div className="flex flex-col items-end">
+                            {enableListPriceMode ? (
+                              <>
+                                <span className="font-bold text-slate-900">
+                                  List: {formatINR(p.list_price)}
+                                </span>
+                                {p.discount_percentage > 0 && (
+                                  <span className="text-xs text-emerald-600 font-semibold">
+                                    Dis: {p.discount_percentage}%
+                                  </span>
+                                )}
+                              </>
+                            ) : (
+                              <>
+                                <span className="font-bold text-slate-900">
+                                  Cost: {formatINR(p.cost_price)}
+                                </span>
+                                <span className="text-xs text-blue-600 font-semibold">
+                                  Margin: {p.margin_percentage ?? 15}%
+                                </span>
+                              </>
+                            )}
+                          </div>
+                        </button>
+                      ))}
+                      <div className="mt-1 border-t border-slate-100 pt-1 text-center">
+                        <button
+                          onClick={() => {
+                            onAddNewProductClick(productSearch)
+                            setShowProductDropdown(false)
+                          }}
+                          className="text-xs font-bold text-blue-600 hover:underline py-1 cursor-pointer"
+                        >
+                          + Add Custom / Unlisted Product to Catalog
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </div>
               </div>
             )}
           </div>
