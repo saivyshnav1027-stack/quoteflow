@@ -37,6 +37,8 @@ export interface EstimatorViewProps {
   summary: EstimatorSummary
   enableListPriceMode: boolean
   enableFlatRupeeDiscount: boolean
+  enablePriceAfterMargin?: boolean
+  onTogglePriceAfterMargin?: (enabled: boolean) => void
   whatsappSharedNotice: boolean
   onDismissWhatsAppNotice: () => void
   onClearEstimateDirect: () => void
@@ -63,6 +65,8 @@ export const EstimatorView: React.FC<EstimatorViewProps> = ({
   summary,
   enableListPriceMode,
   enableFlatRupeeDiscount,
+  enablePriceAfterMargin = false,
+  onTogglePriceAfterMargin,
   whatsappSharedNotice,
   onDismissWhatsAppNotice,
   onClearEstimateDirect,
@@ -134,6 +138,27 @@ export const EstimatorView: React.FC<EstimatorViewProps> = ({
           </p>
         </div>
         <div className="flex items-center gap-2">
+          {onTogglePriceAfterMargin && (
+            <button
+              type="button"
+              onClick={() => onTogglePriceAfterMargin(!enablePriceAfterMargin)}
+              className={`flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-bold transition-all cursor-pointer shadow-sm ${
+                enablePriceAfterMargin
+                  ? 'bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100'
+                  : 'bg-white border-slate-200 text-slate-500 hover:bg-slate-50'
+              }`}
+              title="Toggle Price + Margin markup breakdown column in real-time"
+            >
+              <span>Price+Margin:</span>
+              <span
+                className={`rounded-full px-1.5 py-0.5 text-[10px] font-black uppercase ${
+                  enablePriceAfterMargin ? 'bg-blue-600 text-white' : 'bg-slate-200 text-slate-600'
+                }`}
+              >
+                {enablePriceAfterMargin ? 'ON' : 'OFF'}
+              </span>
+            </button>
+          )}
           <span className="rounded-xl bg-white border border-slate-200 px-3.5 py-1.5 text-xs font-bold text-slate-800 shadow-sm flex items-center gap-1.5">
             <Receipt className="h-3.5 w-3.5 text-blue-600" />
             <span>Est No: #{currentEstimateNo}</span>
@@ -434,7 +459,9 @@ export const EstimatorView: React.FC<EstimatorViewProps> = ({
                 )}
                 <th className="py-3 px-3 text-right w-28">Cost Price (₹)</th>
                 <th className="py-3 px-3 text-right w-20">Margin%</th>
-                <th className="py-3 px-3 text-right w-24">Price + Margin</th>
+                {enablePriceAfterMargin && (
+                  <th className="py-3 px-3 text-right w-24">Price + Margin</th>
+                )}
                 <th className="py-3 px-3 text-right w-32">Cust. Dis</th>
                 <th className="py-3 px-3 text-right w-28">Net Price</th>
                 <th className="py-3 px-3 text-right w-32">Amount (₹)</th>
@@ -445,7 +472,7 @@ export const EstimatorView: React.FC<EstimatorViewProps> = ({
               {estimateRows.length === 0 ? (
                 <tr>
                   <td
-                    colSpan={enableListPriceMode ? 14 : 12}
+                    colSpan={(enableListPriceMode ? 13 : 11) + (enablePriceAfterMargin ? 1 : 0)}
                     className="py-12 text-center text-slate-400 text-sm"
                   >
                     No items added to estimate yet. Use the product search bar above to add items.
@@ -556,11 +583,13 @@ export const EstimatorView: React.FC<EstimatorViewProps> = ({
                     </td>
 
                     {/* Price After Margin */}
-                    <td className="py-2.5 px-3 text-right font-semibold text-slate-500">
-                      {formatINR(
-                        Number((row.costPrice * (1 + (row.marginPercentage || 0) / 100)).toFixed(2))
-                      )}
-                    </td>
+                    {enablePriceAfterMargin && (
+                      <td className="py-2.5 px-3 text-right font-semibold text-slate-500">
+                        {formatINR(
+                          Number((row.costPrice * (1 + (row.marginPercentage || 0) / 100)).toFixed(2))
+                        )}
+                      </td>
+                    )}
 
                     {/* Customer Discount */}
                     <td className="py-2.5 px-3 text-right">
@@ -639,7 +668,7 @@ export const EstimatorView: React.FC<EstimatorViewProps> = ({
                     {summary.totalUnits.toFixed(2)} Units
                   </td>
                   <td
-                    colSpan={enableListPriceMode ? 7 : 5}
+                    colSpan={(enableListPriceMode ? 6 : 4) + (enablePriceAfterMargin ? 1 : 0)}
                     className="py-3 px-3 text-right text-slate-500 font-semibold"
                   >
                     Total Estimate:

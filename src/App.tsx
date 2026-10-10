@@ -3,6 +3,7 @@ import { CheckCircle2 } from 'lucide-react'
 import type { Customer, Product, EstimateRow, Quotation, PrintQuoteData, ActivePage } from './types'
 import { calculateRow as calcRow, calculateTotals } from './lib/pricing'
 import { getWhatsAppShareUrl } from './lib/whatsapp'
+import { getNextEstimateNumber, incrementEstimateNumber, getTodayDatePrefix } from './lib/estimateNumber'
 
 import { LoginScreen } from './components/Auth/LoginScreen'
 import { Sidebar } from './components/Layout/Sidebar'
@@ -29,9 +30,14 @@ function App() {
   // Landing page: Default is ALWAYS Dashboard
   const [activePage, setActivePage] = useState<ActivePage>('Dashboard')
 
-  // Stable sequential estimate number
+  // Stable sequential estimate number (YYMMDDA1 format)
   const [currentEstimateNo, setCurrentEstimateNo] = useState<string>(() => {
-    return localStorage.getItem('sri_current_estimate_no') || '2354'
+    const todayPrefix = getTodayDatePrefix()
+    const stored = localStorage.getItem('sri_current_estimate_no')
+    if (stored && stored.startsWith(todayPrefix)) {
+      return stored
+    }
+    return `${todayPrefix}A1`
   })
 
   // Admin Feature Flags
@@ -42,6 +48,9 @@ function App() {
     const stored = localStorage.getItem('quoteflow_flag_rupee_discount')
     return stored !== null ? stored === 'true' : true
   })
+  const [enablePriceAfterMargin, setEnablePriceAfterMargin] = useState<boolean>(() => {
+    return localStorage.getItem('quoteflow_flag_price_after_margin') === 'true'
+  })
 
   const toggleListPriceMode = (val: boolean) => {
     setEnableListPriceMode(val)
@@ -51,6 +60,11 @@ function App() {
   const toggleFlatRupeeDiscount = (val: boolean) => {
     setEnableFlatRupeeDiscount(val)
     localStorage.setItem('quoteflow_flag_rupee_discount', String(val))
+  }
+
+  const togglePriceAfterMargin = (val: boolean) => {
+    setEnablePriceAfterMargin(val)
+    localStorage.setItem('quoteflow_flag_price_after_margin', String(val))
   }
 
   // Global Data
@@ -133,17 +147,7 @@ function App() {
       const data = await res.json()
       if (Array.isArray(data)) {
         setQuotations(data)
-        let maxNum = 2353
-        for (const q of data) {
-          const match = String(q.quotation_number || '').match(/\d+/)
-          if (match) {
-            const n = parseInt(match[0], 10)
-            if (!isNaN(n) && n > maxNum) {
-              maxNum = n
-            }
-          }
-        }
-        const nextNumStr = String(maxNum + 1)
+        const nextNumStr = getNextEstimateNumber(data.map((q: Quotation) => q.quotation_number))
         setCurrentEstimateNo(nextNumStr)
         localStorage.setItem('sri_current_estimate_no', nextNumStr)
       }
@@ -214,7 +218,7 @@ function App() {
     setIsSavingQuote(true)
     try {
       const payload = {
-        quotationNumber: `EST-${currentEstimateNo}`,
+        quotationNumber: currentEstimateNo,
         customerId: selectedCustomer.id || null,
         customerName: selectedCustomer.customer_name || 'Guest Walk-In',
         customerPhone: selectedCustomer.phone || '',
@@ -258,12 +262,10 @@ function App() {
           items: estimateRows,
         })
 
-        const match = String(data.quotation?.quotationNumber || '').match(/\d+/)
-        const assignedNum = match ? parseInt(match[0], 10) : (parseInt(currentEstimateNo, 10) || 2354)
-        const nextNum = assignedNum + 1
-        const nextStr = String(nextNum)
-        setCurrentEstimateNo(nextStr)
-        localStorage.setItem('sri_current_estimate_no', nextStr)
+        const assignedNo = data.quotation?.quotationNumber || currentEstimateNo
+        const nextNo = incrementEstimateNumber(assignedNo)
+        setCurrentEstimateNo(nextNo)
+        localStorage.setItem('sri_current_estimate_no', nextNo)
       } else {
         alert('Failed to save quotation: ' + (data.message || data.error || 'Unknown error'))
       }
@@ -293,6 +295,8 @@ function App() {
     })
     window.open(url, '_blank')
     setWhatsappSharedNotice(true)
+    // Auto-save estimate to database when shared
+    saveQuotationToBackend()
   }
 
   // Clear Estimate
@@ -306,10 +310,9 @@ function App() {
   const clearCurrentEstimateDirect = () => {
     setEstimateRows([])
     setWhatsappSharedNotice(false)
-    const nextNum = (parseInt(currentEstimateNo, 10) || 2354) + 1
-    const nextStr = String(nextNum)
-    setCurrentEstimateNo(nextStr)
-    localStorage.setItem('sri_current_estimate_no', nextStr)
+    const nextNo = incrementEstimateNumber(currentEstimateNo)
+    setCurrentEstimateNo(nextNo)
+    localStorage.setItem('sri_current_estimate_no', nextNo)
   }
 
   // Open Print Modal for Current Active Estimate
@@ -365,6 +368,49 @@ function App() {
       }
     } catch (e) {
       console.error(e)
+    }
+  }
+
+  // Delete & Purge Quotation Handlers
+  const handleDeleteQuotation = async (q: Quotation) => {
+    if (confirm(`Delete estimate #${q.quotation_number} (${q.customer_name}) from the database?`)) {
+      try {
+        const res = await fetch(`${API_BASE}/quotations/${q.id}`, { method: 'DELETE' })
+        const data = await res.json()
+        if (data.success) {
+          loadQuotations()
+        } else {
+          alert('Failed to delete estimate: ' + (data.message || 'Unknown error'))
+        }
+      } catch (e) {
+        console.error(e)
+        alert('Failed to delete estimate')
+      }
+    }
+  }
+
+  const handlePurgeQuotations = async (timeline: 'weekly' | 'monthly' | 'all') => {
+    const label =
+      timeline === 'weekly'
+        ? 'older than 7 days (Weekly)'
+        : timeline === 'monthly'
+        ? 'older than 30 days (Monthly)'
+        : 'ALL estimate records'
+
+    if (confirm(`Are you sure you want to delete estimates ${label}? This cannot be undone.`)) {
+      try {
+        const res = await fetch(`${API_BASE}/quotations?timeline=${timeline}`, { method: 'DELETE' })
+        const data = await res.json()
+        if (data.success) {
+          alert(`Successfully deleted ${data.deletedCount ?? 0} estimate(s).`)
+          loadQuotations()
+        } else {
+          alert('Failed to purge estimates: ' + (data.message || 'Unknown error'))
+        }
+      } catch (e) {
+        console.error(e)
+        alert('Failed to purge estimates')
+      }
     }
   }
 
@@ -499,6 +545,8 @@ function App() {
               quotations={quotations}
               onCreateEstimateClick={() => setActivePage('Estimator')}
               onViewPrintSlip={handleViewQuotationPrintSlip}
+              onDeleteQuotation={handleDeleteQuotation}
+              onPurgeQuotations={handlePurgeQuotations}
             />
           )}
 
@@ -519,6 +567,8 @@ function App() {
               summary={summary}
               enableListPriceMode={enableListPriceMode}
               enableFlatRupeeDiscount={enableFlatRupeeDiscount}
+              enablePriceAfterMargin={enablePriceAfterMargin}
+              onTogglePriceAfterMargin={togglePriceAfterMargin}
               whatsappSharedNotice={whatsappSharedNotice}
               onDismissWhatsAppNotice={() => setWhatsappSharedNotice(false)}
               onClearEstimateDirect={clearCurrentEstimateDirect}
@@ -556,8 +606,10 @@ function App() {
             <AdminSettingsView
               enableListPriceMode={enableListPriceMode}
               enableFlatRupeeDiscount={enableFlatRupeeDiscount}
+              enablePriceAfterMargin={enablePriceAfterMargin}
               onToggleListPriceMode={toggleListPriceMode}
               onToggleFlatRupeeDiscount={toggleFlatRupeeDiscount}
+              onTogglePriceAfterMargin={togglePriceAfterMargin}
             />
           )}
         </main>

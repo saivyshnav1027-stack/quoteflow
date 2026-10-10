@@ -168,25 +168,56 @@ export default async function handler(req, res) {
       const total = Number(subtotal.toFixed(2))
       totalUnits = Number(totalUnits.toFixed(2))
 
-      // Find highest existing quotation number to avoid UNIQUE constraint violations
+      const now = new Date()
+      const yy = String(now.getFullYear()).slice(-2)
+      const mm = String(now.getMonth() + 1).padStart(2, '0')
+      const dd = String(now.getDate()).padStart(2, '0')
+      const datePrefix = `${yy}${mm}${dd}`
+
+      // Find highest existing quotation sequence for today to avoid collisions
       const quotesRes = await db.execute('SELECT quotation_number FROM quotations')
-      let maxNum = 2353
       const existingNumbers = new Set()
+      let maxSeq = 0
+
       for (const row of quotesRes.rows) {
-        const numStr = String(row.quotation_number || '')
+        const numStr = String(row.quotation_number || '').trim()
         existingNumbers.add(numStr)
-        const match = numStr.match(/\d+/)
+
+        const regex = new RegExp(`^(?:EST-)?${datePrefix}A(\\d+)$`, 'i')
+        const match = numStr.match(regex)
         if (match) {
-          const n = parseInt(match[0], 10)
-          if (!isNaN(n) && n > maxNum) {
-            maxNum = n
+          const seq = parseInt(match[1], 10)
+          if (!isNaN(seq) && seq > maxSeq) {
+            maxSeq = seq
           }
         }
       }
 
-      let quotationNumber = body.quotationNumber ? String(body.quotationNumber).trim() : `EST-${maxNum + 1}`
+      let quotationNumber = body.quotationNumber ? String(body.quotationNumber).trim() : ''
       if (!quotationNumber || existingNumbers.has(quotationNumber)) {
-        quotationNumber = `EST-${maxNum + 1}`
+        quotationNumber = `${datePrefix}A${maxSeq + 1}`
+      }
+
+      let validCustomerId = null
+      if (customerId) {
+        const custCheck = await db.execute({
+          sql: 'SELECT id FROM customers WHERE id = ?',
+          args: [customerId],
+        })
+        if (custCheck.rows.length > 0) {
+          validCustomerId = customerId
+        }
+      }
+
+      let validCustomerTypeId = null
+      if (customerTypeId) {
+        const typeCheck = await db.execute({
+          sql: 'SELECT id FROM customer_types WHERE id = ?',
+          args: [customerTypeId],
+        })
+        if (typeCheck.rows.length > 0) {
+          validCustomerTypeId = customerTypeId
+        }
       }
 
       const quoteResult = await db.execute({
@@ -195,12 +226,23 @@ export default async function handler(req, res) {
           (quotation_number, customer_id, customer_type_id, markup_percentage, subtotal, total_units, total)
           VALUES (?, ?, ?, ?, ?, ?, ?)
         `,
-        args: [quotationNumber, customerId, customerTypeId, markupPercentage, total, totalUnits, total],
+        args: [quotationNumber, validCustomerId, validCustomerTypeId, markupPercentage, total, totalUnits, total],
       })
 
       const quotationId = Number(quoteResult.lastInsertRowid)
 
       for (const item of processedItems) {
+        let validProductId = null
+        if (item.productId) {
+          const prodCheck = await db.execute({
+            sql: 'SELECT id FROM products WHERE id = ?',
+            args: [item.productId],
+          })
+          if (prodCheck.rows.length > 0) {
+            validProductId = item.productId
+          }
+        }
+
         await db.execute({
           sql: `
             INSERT INTO quotation_items 
@@ -209,7 +251,7 @@ export default async function handler(req, res) {
           `,
           args: [
             quotationId,
-            item.productId,
+            validProductId,
             item.description,
             item.quantity,
             item.unit,
@@ -246,6 +288,83 @@ export default async function handler(req, res) {
     } catch (error) {
       console.error('Create quotation error:', error)
       return res.status(500).json({ success: false, message: 'Failed to create quotation', error: String(error) })
+    }
+  }
+
+  if (method === 'DELETE') {
+    try {
+      // 1. Single quotation deletion by id
+      const singleId = req.query.id ? Number(req.query.id) : null
+      if (singleId) {
+        await db.execute({
+          sql: `DELETE FROM quotation_items WHERE quotation_id = ?`,
+          args: [singleId],
+        })
+        await db.execute({
+          sql: `DELETE FROM quotations WHERE id = ?`,
+          args: [singleId],
+        })
+        return res.status(200).json({ success: true, message: 'Quotation deleted successfully' })
+      }
+
+      // 2. Timeline-based batch deletion
+      const timeline = String(req.query.timeline || req.body?.timeline || '').toLowerCase()
+      const olderThanDays = req.query.olderThanDays ? Number(req.query.olderThanDays) : null
+
+      let matchingSql = `SELECT id FROM quotations`
+      let args = []
+
+      if (timeline === 'weekly' || olderThanDays === 7) {
+        const cutoff = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
+        matchingSql += ` WHERE created_at < ? OR datetime(created_at) < datetime('now', '-7 days')`
+        args = [cutoff]
+      } else if (timeline === 'monthly' || olderThanDays === 30) {
+        const cutoff = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()
+        matchingSql += ` WHERE created_at < ? OR datetime(created_at) < datetime('now', '-30 days')`
+        args = [cutoff]
+      } else if (timeline === 'all') {
+        // Purge all records
+      } else {
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid request. Provide id or timeline=weekly, monthly, or all',
+        })
+      }
+
+      const matches = await db.execute({
+        sql: matchingSql,
+        args,
+      })
+
+      const ids = matches.rows.map((r) => Number(r.id)).filter((id) => Number.isInteger(id))
+
+      if (ids.length === 0) {
+        return res.status(200).json({
+          success: true,
+          deletedCount: 0,
+          message: 'No estimates found matching the specified timeline',
+        })
+      }
+
+      const placeholders = ids.map(() => '?').join(',')
+      await db.execute({
+        sql: `DELETE FROM quotation_items WHERE quotation_id IN (${placeholders})`,
+        args: ids,
+      })
+
+      await db.execute({
+        sql: `DELETE FROM quotations WHERE id IN (${placeholders})`,
+        args: ids,
+      })
+
+      return res.status(200).json({
+        success: true,
+        deletedCount: ids.length,
+        message: `Successfully deleted ${ids.length} estimate(s)`,
+      })
+    } catch (error) {
+      console.error('Delete quotation error:', error)
+      return res.status(500).json({ success: false, message: 'Failed to delete quotation(s)', error: String(error) })
     }
   }
 
