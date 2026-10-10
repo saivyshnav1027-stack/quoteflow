@@ -6,12 +6,14 @@ export interface CustomerDirectoryProps {
   customers: Customer[]
   onAddCustomerClick: () => void
   onSelectForEstimate: (customer: Customer) => void
+  onDeleteCustomer?: (customer: Customer) => Promise<void> | void
 }
 
 export const CustomerDirectory: React.FC<CustomerDirectoryProps> = ({
   customers,
   onAddCustomerClick,
   onSelectForEstimate,
+  onDeleteCustomer,
 }) => {
   return (
     <div className="space-y-6">
@@ -49,10 +51,19 @@ export const CustomerDirectory: React.FC<CustomerDirectoryProps> = ({
                   <td className="py-3 px-4 text-center">
                     <button
                       onClick={() => onSelectForEstimate(c)}
-                      className="rounded-lg bg-blue-50 px-3.5 py-1.5 text-xs font-bold text-blue-700 hover:bg-blue-100 transition-colors cursor-pointer"
+                      className="rounded-lg bg-blue-50 px-3.5 py-1.5 text-xs font-bold text-blue-700 hover:bg-blue-100 transition-colors cursor-pointer mr-2"
                     >
                       New Estimate
                     </button>
+                    {onDeleteCustomer && (
+                      <button
+                        onClick={() => onDeleteCustomer(c)}
+                        className="rounded p-1 text-slate-400 hover:text-red-600 transition-colors cursor-pointer"
+                        title="Delete customer"
+                      >
+                        Delete
+                      </button>
+                    )}
                   </td>
                 </tr>
               ))}
