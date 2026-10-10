@@ -1,0 +1,672 @@
+import React, { useState } from 'react'
+import {
+  Receipt,
+  Plus,
+  Search,
+  Trash2,
+  CheckCircle2,
+  RotateCcw,
+  X,
+  Printer,
+  Share2,
+  Check,
+} from 'lucide-react'
+import type { Customer, Product, EstimateRow } from '../../types'
+import { formatINR } from '../../lib/pricing'
+
+export interface EstimatorSummary {
+  itemCount: number
+  totalUnits: number
+  totalSavings: number
+  totalAmount: number
+}
+
+export interface EstimatorViewProps {
+  currentEstimateNo: string
+  onNewEstimateClick: () => void
+  customers: Customer[]
+  selectedCustomer: Customer | null
+  onSelectCustomer: (customer: Customer) => void
+  onNewCustomerClick: () => void
+  products: Product[]
+  onAddProductToEstimate: (product: Product) => void
+  onAddNewProductClick: (prefillName?: string) => void
+  estimateRows: EstimateRow[]
+  onUpdateRow: (id: string, field: keyof EstimateRow, value: any) => void
+  onRemoveRow: (id: string) => void
+  summary: EstimatorSummary
+  enableListPriceMode: boolean
+  enableFlatRupeeDiscount: boolean
+  whatsappSharedNotice: boolean
+  onDismissWhatsAppNotice: () => void
+  onClearEstimateDirect: () => void
+  onClearEstimate: () => void
+  onOpenPrintSlip: () => void
+  onShareWhatsApp: () => void
+  onSaveEstimate: () => void
+  isSavingQuote: boolean
+}
+
+export const EstimatorView: React.FC<EstimatorViewProps> = ({
+  currentEstimateNo,
+  onNewEstimateClick,
+  customers,
+  selectedCustomer,
+  onSelectCustomer,
+  onNewCustomerClick,
+  products,
+  onAddProductToEstimate,
+  onAddNewProductClick,
+  estimateRows,
+  onUpdateRow,
+  onRemoveRow,
+  summary,
+  enableListPriceMode,
+  enableFlatRupeeDiscount,
+  whatsappSharedNotice,
+  onDismissWhatsAppNotice,
+  onClearEstimateDirect,
+  onClearEstimate,
+  onOpenPrintSlip,
+  onShareWhatsApp,
+  onSaveEstimate,
+  isSavingQuote,
+}) => {
+  const [customerSearch, setCustomerSearch] = useState('')
+  const [showCustomerDropdown, setShowCustomerDropdown] = useState(false)
+  const [productSearch, setProductSearch] = useState('')
+  const [showProductDropdown, setShowProductDropdown] = useState(false)
+
+  const filteredCustomers = customers.filter(
+    (c) =>
+      c.customer_name.toLowerCase().includes(customerSearch.toLowerCase()) ||
+      c.phone.toLowerCase().includes(customerSearch.toLowerCase())
+  )
+
+  const filteredProducts = products.filter(
+    (p) =>
+      p.product_name.toLowerCase().includes(productSearch.toLowerCase()) ||
+      p.product_code.toLowerCase().includes(productSearch.toLowerCase())
+  )
+
+  return (
+    <div className="space-y-6">
+      {/* Header Title */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight text-slate-900">Quote Estimator</h1>
+          <p className="mt-0.5 text-sm text-slate-500">
+            Generate instant estimates for walk-in customers & wholesale agri-parties
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="rounded-xl bg-white border border-slate-200 px-3.5 py-1.5 text-xs font-bold text-slate-800 shadow-sm flex items-center gap-1.5">
+            <Receipt className="h-3.5 w-3.5 text-blue-600" />
+            <span>Est No: #{currentEstimateNo}</span>
+          </span>
+          <button
+            onClick={onNewEstimateClick}
+            className="flex items-center gap-1.5 rounded-xl bg-blue-50 hover:bg-blue-100 border border-blue-200 px-3.5 py-1.5 text-xs font-bold text-blue-700 transition-colors cursor-pointer shadow-sm"
+            title="Start new blank estimate with next sequential number"
+          >
+            <Plus className="h-3.5 w-3.5" />
+            <span>+ New Estimate</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Section A: Customer Selector Bar */}
+      <div className="relative rounded-2xl bg-white p-5 shadow-sm border border-slate-200/80">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+          {/* Customer Search / Picker */}
+          <div className="relative flex-1">
+            <div className="relative">
+              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+              <input
+                type="text"
+                placeholder="Search existing customer by Name or Phone (+91)..."
+                value={customerSearch}
+                onChange={(e) => {
+                  setCustomerSearch(e.target.value)
+                  setShowCustomerDropdown(true)
+                }}
+                onFocus={() => setShowCustomerDropdown(true)}
+                className="w-full rounded-xl border border-slate-200 bg-slate-50 pl-10 pr-4 py-2.5 text-sm text-slate-900 placeholder-slate-400 outline-none focus:border-blue-500 focus:bg-white focus:ring-2 focus:ring-blue-100 transition-all"
+              />
+            </div>
+
+            {/* Customer Dropdown */}
+            {showCustomerDropdown && (
+              <div className="absolute left-0 right-0 top-12 z-30 max-h-60 overflow-y-auto rounded-xl border border-slate-200 bg-white p-1.5 shadow-xl">
+                {filteredCustomers.length === 0 ? (
+                  <div className="p-3 text-center text-xs text-slate-400">
+                    No matching customers found
+                  </div>
+                ) : (
+                  filteredCustomers.map((c) => (
+                    <button
+                      key={c.id}
+                      onClick={() => {
+                        onSelectCustomer(c)
+                        setShowCustomerDropdown(false)
+                        setCustomerSearch('')
+                      }}
+                      className="flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm hover:bg-slate-50 transition-colors cursor-pointer"
+                    >
+                      <div className="flex flex-col">
+                        <span className="font-semibold text-slate-800">{c.customer_name}</span>
+                        <span className="text-xs text-slate-400">{c.phone || 'No phone'}</span>
+                      </div>
+                      <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-[11px] font-semibold text-slate-600">
+                        #{c.id}
+                      </span>
+                    </button>
+                  ))
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Quick Action Buttons */}
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              onClick={onNewCustomerClick}
+              className="flex items-center gap-1.5 rounded-xl bg-blue-50 px-4 py-2.5 text-xs font-bold text-blue-700 hover:bg-blue-100 transition-colors border border-blue-200 cursor-pointer"
+            >
+              <Plus className="h-4 w-4" />
+              <span>New Customer</span>
+            </button>
+            <button
+              onClick={() => {
+                onSelectCustomer({
+                  id: 0,
+                  customer_name: 'Guest Walk-In',
+                  phone: '',
+                  customer_type_id: 1,
+                  type_name: '',
+                  markup_percentage: 0,
+                })
+                setCustomerSearch('')
+                setShowCustomerDropdown(false)
+              }}
+              className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-xs font-bold text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
+            >
+              Guest Walk-In
+            </button>
+          </div>
+        </div>
+
+        {/* Selected Customer Banner */}
+        {selectedCustomer && (
+          <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl bg-slate-50 p-3.5 border border-slate-200/60">
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-blue-600 font-bold text-white shadow-sm">
+                {selectedCustomer.customer_name.substring(0, 2).toUpperCase()}
+              </div>
+              <div className="flex flex-col">
+                <div className="flex items-center gap-2">
+                  <span className="font-bold text-slate-900">{selectedCustomer.customer_name}</span>
+                  <span className="rounded-full bg-blue-50 px-2.5 py-0.5 text-[11px] font-bold text-blue-700">
+                    {selectedCustomer.id === 0 ? 'Cash Customer' : 'Counter Client'}
+                  </span>
+                </div>
+                <span className="text-xs text-slate-500">
+                  {selectedCustomer.phone || 'Walk-in / Cash Customer'}
+                </span>
+              </div>
+            </div>
+            <div className="text-xs text-slate-400">Direct product margin pricing applied</div>
+          </div>
+        )}
+      </div>
+
+      {/* Section B: Product Search Bar */}
+      <div className="rounded-2xl bg-white p-5 shadow-sm border border-slate-200/80 space-y-4">
+        <div className="flex flex-col sm:flex-row items-center gap-3">
+          <div className="relative flex-1 w-full">
+            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+            <input
+              type="text"
+              placeholder="Type product name, pipe size, clamp or code (e.g. CPVC, Ashirwad, Nandi, FRP)..."
+              value={productSearch}
+              onChange={(e) => {
+                setProductSearch(e.target.value)
+                setShowProductDropdown(true)
+              }}
+              onFocus={() => setShowProductDropdown(true)}
+              className="w-full rounded-xl border border-slate-200 bg-slate-50 pl-10 pr-4 py-2.5 text-sm text-slate-900 placeholder-slate-400 outline-none focus:border-blue-500 focus:bg-white focus:ring-2 focus:ring-blue-100 transition-all"
+            />
+
+            {/* Product Dropdown */}
+            {showProductDropdown && (
+              <div className="absolute left-0 right-0 top-12 z-30 max-h-72 overflow-y-auto rounded-xl border border-slate-200 bg-white p-2 shadow-xl">
+                {filteredProducts.length === 0 ? (
+                  <div className="p-4 text-center">
+                    <p className="text-xs text-slate-500 mb-2">
+                      "{productSearch}" is not in inventory.
+                    </p>
+                    <button
+                      onClick={() => {
+                        onAddNewProductClick(productSearch)
+                        setShowProductDropdown(false)
+                      }}
+                      className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-blue-700 cursor-pointer"
+                    >
+                      + Add "{productSearch}" to Inventory
+                    </button>
+                  </div>
+                ) : (
+                  <>
+                    {filteredProducts.map((p) => (
+                      <button
+                        key={p.id}
+                        onClick={() => {
+                          onAddProductToEstimate(p)
+                          setProductSearch('')
+                          setShowProductDropdown(false)
+                        }}
+                        className="flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm hover:bg-blue-50 transition-colors cursor-pointer"
+                      >
+                        <div className="flex flex-col">
+                          <span className="font-semibold text-slate-800">{p.product_name}</span>
+                          <span className="text-xs text-slate-400">
+                            Code: {p.product_code} | Unit: {p.unit}
+                          </span>
+                        </div>
+                        <div className="flex flex-col items-end">
+                          {enableListPriceMode ? (
+                            <>
+                              <span className="font-bold text-slate-900">
+                                List: {formatINR(p.list_price)}
+                              </span>
+                              {p.discount_percentage > 0 && (
+                                <span className="text-xs text-emerald-600 font-semibold">
+                                  Dis: {p.discount_percentage}%
+                                </span>
+                              )}
+                            </>
+                          ) : (
+                            <>
+                              <span className="font-bold text-slate-900">
+                                Cost: {formatINR(p.cost_price)}
+                              </span>
+                              <span className="text-xs text-blue-600 font-semibold">
+                                Margin: {p.margin_percentage ?? 15}%
+                              </span>
+                            </>
+                          )}
+                        </div>
+                      </button>
+                    ))}
+                    <div className="mt-1 border-t border-slate-100 pt-1 text-center">
+                      <button
+                        onClick={() => {
+                          onAddNewProductClick(productSearch)
+                          setShowProductDropdown(false)
+                        }}
+                        className="text-xs font-bold text-blue-600 hover:underline py-1 cursor-pointer"
+                      >
+                        + Add Custom / Unlisted Product to Catalog
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
+          </div>
+
+          <button
+            onClick={() => onAddNewProductClick()}
+            className="flex w-full sm:w-auto items-center justify-center gap-1.5 rounded-xl bg-slate-900 px-4 py-2.5 text-xs font-bold text-white hover:bg-slate-800 transition-colors shrink-0 cursor-pointer"
+          >
+            <Plus className="h-4 w-4" />
+            <span>New Product</span>
+          </button>
+        </div>
+
+        {/* Estimate Line Items Table */}
+        <div className="overflow-x-auto rounded-xl border border-slate-200">
+          <table className="w-full text-left text-xs border-collapse">
+            <thead>
+              <tr className="bg-slate-100 font-bold uppercase tracking-wider text-slate-600 border-b border-slate-200 select-none">
+                <th className="py-3 px-3 text-center w-12">S.N.</th>
+                <th className="py-3 px-3">Description of Goods</th>
+                <th className="py-3 px-2 text-center w-12">Chek</th>
+                <th className="py-3 px-3 text-right w-24">Qty.</th>
+                <th className="py-3 px-3 w-20">Unit</th>
+                {enableListPriceMode && (
+                  <>
+                    <th className="py-3 px-3 text-right w-24">List Price (₹)</th>
+                    <th className="py-3 px-3 text-right w-20">Trade Dis%</th>
+                  </>
+                )}
+                <th className="py-3 px-3 text-right w-28">Cost Price (₹)</th>
+                <th className="py-3 px-3 text-right w-20">Margin%</th>
+                <th className="py-3 px-3 text-right w-24">Price + Margin</th>
+                <th className="py-3 px-3 text-right w-32">Cust. Dis</th>
+                <th className="py-3 px-3 text-right w-28">Net Price</th>
+                <th className="py-3 px-3 text-right w-32">Amount (₹)</th>
+                <th className="py-3 px-2 text-center w-12">Action</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100 text-slate-800 font-medium">
+              {estimateRows.length === 0 ? (
+                <tr>
+                  <td
+                    colSpan={enableListPriceMode ? 14 : 12}
+                    className="py-12 text-center text-slate-400 text-sm"
+                  >
+                    No items added to estimate yet. Use the product search bar above to add items.
+                  </td>
+                </tr>
+              ) : (
+                estimateRows.map((row, idx) => (
+                  <tr key={row.id} className="hover:bg-slate-50 transition-colors">
+                    <td className="py-2.5 px-3 text-center font-bold text-slate-400">{idx + 1}.</td>
+                    <td className="py-2.5 px-3">
+                      <input
+                        type="text"
+                        value={row.description}
+                        onChange={(e) => onUpdateRow(row.id, 'description', e.target.value)}
+                        className="w-full rounded bg-transparent px-1 py-0.5 font-semibold text-slate-900 outline-none focus:bg-white focus:ring-1 focus:ring-blue-400"
+                      />
+                    </td>
+                    <td className="py-2.5 px-2 text-center">
+                      <input
+                        type="checkbox"
+                        checked={row.checked}
+                        onChange={(e) => onUpdateRow(row.id, 'checked', e.target.checked)}
+                        className="h-4 w-4 rounded text-blue-600 focus:ring-blue-400"
+                      />
+                    </td>
+                    <td className="py-2.5 px-3 text-right">
+                      <input
+                        type="number"
+                        step="any"
+                        min="0.01"
+                        value={row.quantity}
+                        onChange={(e) =>
+                          onUpdateRow(row.id, 'quantity', parseFloat(e.target.value) || 0)
+                        }
+                        className="w-20 rounded border border-slate-200 bg-white px-2 py-1 text-right font-bold text-slate-900 outline-none focus:border-blue-500"
+                      />
+                    </td>
+                    <td className="py-2.5 px-3">
+                      <select
+                        value={row.unit}
+                        onChange={(e) => onUpdateRow(row.id, 'unit', e.target.value)}
+                        className="rounded border border-slate-200 bg-white px-2 py-1 text-xs text-slate-700 outline-none focus:border-blue-500"
+                      >
+                        <option value="Pcs.">Pcs.</option>
+                        <option value="Kgs.">Kgs.</option>
+                        <option value="Mtr.">Mtr.</option>
+                        <option value="Rolls">Rolls</option>
+                        <option value="Sets">Sets</option>
+                        <option value="Ft.">Ft.</option>
+                      </select>
+                    </td>
+
+                    {enableListPriceMode && (
+                      <>
+                        <td className="py-2.5 px-3 text-right">
+                          <input
+                            type="number"
+                            step="0.01"
+                            value={row.listPrice}
+                            onChange={(e) =>
+                              onUpdateRow(row.id, 'listPrice', parseFloat(e.target.value) || 0)
+                            }
+                            className="w-20 rounded border border-slate-200 bg-white px-2 py-1 text-right font-semibold text-slate-700 outline-none focus:border-blue-500"
+                          />
+                        </td>
+                        <td className="py-2.5 px-3 text-right">
+                          <input
+                            type="number"
+                            step="0.01"
+                            value={row.discountPercentage}
+                            onChange={(e) =>
+                              onUpdateRow(
+                                row.id,
+                                'discountPercentage',
+                                parseFloat(e.target.value) || 0
+                              )
+                            }
+                            className="w-16 rounded border border-slate-200 bg-white px-2 py-1 text-right font-semibold text-emerald-700 outline-none focus:border-blue-500"
+                          />
+                        </td>
+                      </>
+                    )}
+
+                    {/* Cost Price */}
+                    <td className="py-2.5 px-3 text-right">
+                      <input
+                        type="number"
+                        step="0.01"
+                        value={row.costPrice}
+                        onChange={(e) =>
+                          onUpdateRow(row.id, 'costPrice', parseFloat(e.target.value) || 0)
+                        }
+                        className="w-20 rounded border border-slate-200 bg-white px-2 py-1 text-right font-bold text-slate-900 outline-none focus:border-blue-500"
+                      />
+                    </td>
+
+                    {/* Margin % */}
+                    <td className="py-2.5 px-3 text-right">
+                      <input
+                        type="number"
+                        step="0.5"
+                        value={row.marginPercentage}
+                        onChange={(e) =>
+                          onUpdateRow(row.id, 'marginPercentage', parseFloat(e.target.value) || 0)
+                        }
+                        className="w-16 rounded border border-blue-200 bg-blue-50/50 px-2 py-1 text-right font-bold text-blue-700 outline-none focus:border-blue-500"
+                      />
+                    </td>
+
+                    {/* Price After Margin */}
+                    <td className="py-2.5 px-3 text-right font-semibold text-slate-500">
+                      {formatINR(
+                        Number((row.costPrice * (1 + (row.marginPercentage || 0) / 100)).toFixed(2))
+                      )}
+                    </td>
+
+                    {/* Customer Discount */}
+                    <td className="py-2.5 px-3 text-right">
+                      <div className="flex items-center justify-end gap-1">
+                        <input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          value={row.discount || ''}
+                          placeholder="0"
+                          onChange={(e) =>
+                            onUpdateRow(row.id, 'discount', parseFloat(e.target.value) || 0)
+                          }
+                          className="w-16 rounded border border-slate-200 bg-white px-2 py-1 text-right font-semibold text-emerald-700 outline-none focus:border-blue-500"
+                        />
+                        {enableFlatRupeeDiscount ? (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              onUpdateRow(
+                                row.id,
+                                'discountType',
+                                row.discountType === 'RUPEE' ? 'PERCENT' : 'RUPEE'
+                              )
+                            }
+                            className={`px-1.5 py-0.5 text-[10px] font-extrabold rounded border cursor-pointer ${
+                              row.discountType === 'RUPEE'
+                                ? 'bg-amber-100 text-amber-800 border-amber-300'
+                                : 'bg-emerald-100 text-emerald-800 border-emerald-300'
+                            }`}
+                            title={
+                              row.discountType === 'RUPEE'
+                                ? 'Flat ₹ Cash Discount (Click to switch to %)'
+                                : '% Percentage Discount (Click to switch to ₹)'
+                            }
+                          >
+                            {row.discountType === 'RUPEE' ? '₹' : '%'}
+                          </button>
+                        ) : (
+                          <span className="text-xs font-bold text-slate-400">%</span>
+                        )}
+                      </div>
+                    </td>
+
+                    {/* Net Price */}
+                    <td className="py-2.5 px-3 text-right font-bold text-blue-700">
+                      {formatINR(row.price)}
+                    </td>
+
+                    {/* Amount */}
+                    <td className="py-2.5 px-3 text-right font-black text-slate-900">
+                      {formatINR(row.lineTotal)}
+                    </td>
+
+                    <td className="py-2.5 px-2 text-center">
+                      <button
+                        onClick={() => onRemoveRow(row.id)}
+                        className="p-1 text-slate-400 hover:text-red-600 transition-colors cursor-pointer"
+                        title="Remove item"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+            {/* Totals Table Footer */}
+            {estimateRows.length > 0 && (
+              <tfoot>
+                <tr className="bg-slate-100 font-bold text-slate-900 border-t-2 border-slate-300">
+                  <td colSpan={3} className="py-3 px-4 text-left font-black tracking-wider uppercase">
+                    Totals c/o
+                  </td>
+                  <td colSpan={2} className="py-3 px-3 text-left font-black text-blue-700">
+                    {summary.totalUnits.toFixed(2)} Units
+                  </td>
+                  <td
+                    colSpan={enableListPriceMode ? 7 : 5}
+                    className="py-3 px-3 text-right text-slate-500 font-semibold"
+                  >
+                    Total Estimate:
+                  </td>
+                  <td className="py-3 px-3 text-right text-emerald-700 text-sm font-black">
+                    {formatINR(summary.totalAmount)}
+                  </td>
+                  <td></td>
+                </tr>
+              </tfoot>
+            )}
+          </table>
+        </div>
+
+        {/* Post-WhatsApp Share Notice Banner */}
+        {whatsappSharedNotice && (
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-2xl bg-emerald-50 border border-emerald-200 p-4 shadow-sm">
+            <div className="flex items-center gap-3">
+              <div className="h-9 w-9 rounded-xl bg-emerald-600 flex items-center justify-center text-white shrink-0 shadow-sm">
+                <CheckCircle2 className="h-5 w-5" />
+              </div>
+              <div>
+                <p className="text-sm font-bold text-emerald-900">Estimate Shared via WhatsApp!</p>
+                <p className="text-xs text-emerald-700">
+                  Estimate was prepared for <b>{selectedCustomer?.customer_name || 'Customer'}</b>.
+                  Ready to start fresh for the next customer?
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                onClick={onClearEstimateDirect}
+                className="flex items-center gap-1.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 px-4 py-2 text-xs font-bold text-white shadow-sm transition-colors cursor-pointer"
+              >
+                <RotateCcw className="h-3.5 w-3.5" />
+                <span>Clear & Start Next Estimate</span>
+              </button>
+              <button
+                onClick={onDismissWhatsAppNotice}
+                className="rounded-xl border border-emerald-200 bg-white p-2 text-slate-500 hover:bg-emerald-100 transition-colors cursor-pointer"
+                title="Dismiss notice"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Section C: Summary & Action Buttons */}
+        <div className="flex flex-col lg:flex-row items-center justify-between gap-6 pt-2">
+          <div className="flex flex-wrap items-center gap-4 text-xs text-slate-500">
+            <span className="font-semibold text-slate-700">
+              Total Items: <b className="text-slate-900">{summary.itemCount}</b>
+            </span>
+            <span>•</span>
+            <span className="font-semibold text-slate-700">
+              Total Units: <b className="text-blue-700">{summary.totalUnits.toFixed(2)} Units</b>
+            </span>
+            {summary.totalSavings > 0 && (
+              <>
+                <span>•</span>
+                <span className="font-semibold text-emerald-600">
+                  Discount Savings: {formatINR(summary.totalSavings)}
+                </span>
+              </>
+            )}
+          </div>
+
+          {/* Big Total Box */}
+          <div className="flex items-center gap-6">
+            <div className="text-right">
+              <span className="text-xs uppercase tracking-wider text-slate-400 font-bold">
+                Estimated Budget
+              </span>
+              <div className="text-2xl font-black text-emerald-600">
+                {formatINR(summary.totalAmount)}
+              </div>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                onClick={onClearEstimate}
+                disabled={estimateRows.length === 0}
+                className="flex items-center gap-2 rounded-xl border border-rose-200 bg-rose-50 px-4 py-2.5 text-xs font-bold text-rose-700 hover:bg-rose-100 transition-colors shadow-sm disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+                title="Clear all items and start next estimate"
+              >
+                <Trash2 className="h-4 w-4 text-rose-600" />
+                <span>Clear Estimate</span>
+              </button>
+
+              <button
+                onClick={onOpenPrintSlip}
+                className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-bold text-slate-800 hover:bg-slate-50 transition-colors shadow-sm cursor-pointer"
+              >
+                <Printer className="h-4 w-4 text-slate-600" />
+                <span>Print Slip</span>
+              </button>
+
+              <button
+                onClick={onShareWhatsApp}
+                className="flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-xs font-bold text-white hover:bg-emerald-700 transition-colors shadow-sm cursor-pointer"
+              >
+                <Share2 className="h-4 w-4" />
+                <span>WhatsApp (Free)</span>
+              </button>
+
+              <button
+                onClick={onSaveEstimate}
+                disabled={isSavingQuote || estimateRows.length === 0}
+                className="flex items-center gap-2 rounded-xl bg-blue-600 px-5 py-2.5 text-xs font-bold text-white hover:bg-blue-700 transition-colors shadow-md disabled:opacity-50 cursor-pointer"
+              >
+                <Check className="h-4 w-4" />
+                <span>{isSavingQuote ? 'Saving...' : 'Save Estimate'}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
