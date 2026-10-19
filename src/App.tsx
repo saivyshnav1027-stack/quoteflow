@@ -80,6 +80,8 @@ function App() {
   // Estimator State
   const [selectedCustomer, setSelectedCustomer] = useState<Customer>(INITIAL_CUSTOMERS[0])
   const [estimateRows, setEstimateRows] = useState<EstimateRow[]>([])
+  const [editingQuotationId, setEditingQuotationId] = useState<number | null>(null)
+  const [editingEstimateNo, setEditingEstimateNo] = useState<string>('')
   const [isSavingQuote, setIsSavingQuote] = useState(false)
   const [saveSuccessMsg, setSaveSuccessMsg] = useState('')
   const [whatsappSharedNotice, setWhatsappSharedNotice] = useState(false)
@@ -208,7 +210,7 @@ function App() {
     return calculateTotals(estimateRows)
   }, [estimateRows])
 
-  // Save Quotation
+  // Save or Update Quotation
   const saveQuotationToBackend = async () => {
     if (estimateRows.length === 0) {
       alert('Please add at least one product to the estimate.')
@@ -217,8 +219,12 @@ function App() {
 
     setIsSavingQuote(true)
     try {
+      const isUpdating = editingQuotationId !== null
+      const url = isUpdating ? `${API_BASE}/quotations/${editingQuotationId}` : `${API_BASE}/quotations`
+      const method = isUpdating ? 'PUT' : 'POST'
+
       const payload = {
-        quotationNumber: currentEstimateNo,
+        quotationNumber: isUpdating ? editingEstimateNo : currentEstimateNo,
         customerId: selectedCustomer.id || null,
         customerName: selectedCustomer.customer_name || 'Guest Walk-In',
         customerPhone: selectedCustomer.phone || '',
@@ -240,20 +246,25 @@ function App() {
         })),
       }
 
-      const res = await fetch(`${API_BASE}/quotations`, {
-        method: 'POST',
+      const res = await fetch(url, {
+        method,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       })
 
       const data = await res.json()
       if (data.success) {
-        setSaveSuccessMsg(`Quotation saved! ID: ${data.quotation.quotationNumber}`)
+        const savedQuoteNo = data.quotation?.quotationNumber || (isUpdating ? editingEstimateNo : currentEstimateNo)
+        setSaveSuccessMsg(
+          isUpdating
+            ? `Estimate #${savedQuoteNo} updated successfully!`
+            : `Quotation saved! ID: ${savedQuoteNo}`
+        )
         setTimeout(() => setSaveSuccessMsg(''), 4000)
         loadQuotations()
 
         setPrintQuoteData({
-          invoiceNo: data.quotation.quotationNumber,
+          invoiceNo: savedQuoteNo,
           partyName: selectedCustomer.customer_name,
           phone: selectedCustomer.phone,
           dated: `${new Date().toLocaleDateString('en-GB')} (${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })})`,
@@ -262,10 +273,23 @@ function App() {
           items: estimateRows,
         })
 
-        const assignedNo = data.quotation?.quotationNumber || currentEstimateNo
-        const nextNo = incrementEstimateNumber(assignedNo)
-        setCurrentEstimateNo(nextNo)
-        localStorage.setItem('sri_current_estimate_no', nextNo)
+        if (isUpdating) {
+          setEditingQuotationId(null)
+          setEditingEstimateNo('')
+          setEstimateRows([])
+          const todayPrefix = getTodayDatePrefix()
+          const stored = localStorage.getItem('sri_current_estimate_no')
+          if (stored && stored.startsWith(todayPrefix)) {
+            setCurrentEstimateNo(stored)
+          } else {
+            setCurrentEstimateNo(`${todayPrefix}A1`)
+          }
+        } else {
+          const assignedNo = data.quotation?.quotationNumber || currentEstimateNo
+          const nextNo = incrementEstimateNumber(assignedNo)
+          setCurrentEstimateNo(nextNo)
+          localStorage.setItem('sri_current_estimate_no', nextNo)
+        }
       } else {
         alert('Failed to save quotation: ' + (data.message || data.error || 'Unknown error'))
       }
@@ -301,6 +325,12 @@ function App() {
 
   // Clear Estimate
   const clearCurrentEstimate = () => {
+    if (editingQuotationId) {
+      if (window.confirm('Cancel editing estimate and start a fresh estimate for the next customer?')) {
+        cancelEditQuotation()
+      }
+      return
+    }
     if (estimateRows.length === 0) return
     if (window.confirm('Clear all items and start a fresh estimate for the next customer?')) {
       clearCurrentEstimateDirect()
@@ -308,11 +338,27 @@ function App() {
   }
 
   const clearCurrentEstimateDirect = () => {
+    setEditingQuotationId(null)
+    setEditingEstimateNo('')
     setEstimateRows([])
     setWhatsappSharedNotice(false)
     const nextNo = incrementEstimateNumber(currentEstimateNo)
     setCurrentEstimateNo(nextNo)
     localStorage.setItem('sri_current_estimate_no', nextNo)
+  }
+
+  const cancelEditQuotation = () => {
+    setEditingQuotationId(null)
+    setEditingEstimateNo('')
+    setEstimateRows([])
+    setWhatsappSharedNotice(false)
+    const todayPrefix = getTodayDatePrefix()
+    const stored = localStorage.getItem('sri_current_estimate_no')
+    if (stored && stored.startsWith(todayPrefix)) {
+      setCurrentEstimateNo(stored)
+    } else {
+      setCurrentEstimateNo(`${todayPrefix}A1`)
+    }
   }
 
   // Open Print Modal for Current Active Estimate
@@ -368,6 +414,62 @@ function App() {
       }
     } catch (e) {
       console.error(e)
+    }
+  }
+
+  // Open and Edit Quotation from History
+  const handleEditQuotation = async (q: Quotation) => {
+    try {
+      const res = await fetch(`${API_BASE}/quotations/${q.id}`)
+      const data = await res.json()
+      if (data.success && data.quotation) {
+        const quote = data.quotation
+        setEditingQuotationId(q.id)
+        setEditingEstimateNo(q.quotation_number)
+        setCurrentEstimateNo(q.quotation_number)
+
+        const matchedCustomer = customers.find((c) => c.id === q.customer_id)
+        if (matchedCustomer) {
+          setSelectedCustomer(matchedCustomer)
+        } else {
+          setSelectedCustomer({
+            id: q.customer_id || 0,
+            customer_name: q.customer_name || 'Guest Walk-In',
+            phone: q.phone || '',
+            customer_type_id: quote.customer_type_id || 1,
+          })
+        }
+
+        const mappedRows: EstimateRow[] = (quote.items || []).map((it: any) => ({
+          id: String(it.id || Math.random()),
+          productId: it.product_id,
+          productCode: '',
+          description: it.description || 'Custom Item',
+          checked: false,
+          quantity: Number(it.quantity || 1),
+          unit: it.unit || 'Pcs.',
+          listPrice: Number(it.list_price || 0),
+          discountPercentage: Number(it.discount_percentage || 0),
+          costPrice: Number(it.cost_price || 0),
+          marginPercentage: Number(it.margin_percentage ?? 15),
+          discount: Number(it.discount || 0),
+          discountType:
+            String(it.discount_type || 'PERCENT').toUpperCase() === 'RUPEE' ||
+            String(it.discount_type || '').toUpperCase() === 'FLAT'
+              ? 'RUPEE'
+              : 'PERCENT',
+          price: Number(it.price || 0),
+          lineTotal: Number(it.line_total || 0),
+        }))
+
+        setEstimateRows(mappedRows)
+        setActivePage('Estimator')
+      } else {
+        alert('Failed to load quotation for editing: ' + (data.message || 'Quotation not found'))
+      }
+    } catch (e) {
+      console.error('Error loading quotation for edit:', e)
+      alert('Network error while loading quotation.')
     }
   }
 
@@ -545,6 +647,7 @@ function App() {
               quotations={quotations}
               onCreateEstimateClick={() => setActivePage('Estimator')}
               onViewPrintSlip={handleViewQuotationPrintSlip}
+              onEditQuotation={handleEditQuotation}
               onDeleteQuotation={handleDeleteQuotation}
               onPurgeQuotations={handlePurgeQuotations}
             />
@@ -577,6 +680,9 @@ function App() {
               onShareWhatsApp={shareViaWhatsApp}
               onSaveEstimate={saveQuotationToBackend}
               isSavingQuote={isSavingQuote}
+              isEditing={editingQuotationId !== null}
+              editingEstimateNo={editingEstimateNo}
+              onCancelEdit={cancelEditQuotation}
             />
           )}
 

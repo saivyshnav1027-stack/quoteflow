@@ -291,6 +291,184 @@ export default async function handler(req, res) {
     }
   }
 
+  if (method === 'PUT') {
+    try {
+      const targetId = id || (req.body?.id ? Number(req.body.id) : null)
+      if (!targetId || Number.isNaN(targetId)) {
+        return res.status(400).json({ success: false, message: 'Quotation ID is required for update' })
+      }
+
+      const quoteCheck = await db.execute({
+        sql: 'SELECT id, quotation_number FROM quotations WHERE id = ?',
+        args: [targetId],
+      })
+
+      if (quoteCheck.rows.length === 0) {
+        return res.status(404).json({ success: false, message: 'Quotation not found' })
+      }
+
+      const existingQuotationNumber = String(quoteCheck.rows[0].quotation_number)
+
+      const body = req.body || {}
+      const customerId = body.customerId ? Number(body.customerId) : null
+      const customerName = String(body.customerName || 'Guest Walk-In')
+      const customerPhone = String(body.customerPhone || '')
+      const customerTypeId = body.customerTypeId ? Number(body.customerTypeId) : 1
+      const markupPercentage = Number(body.markupPercentage || 0)
+      const items = body.items || []
+
+      if (!Array.isArray(items) || items.length === 0) {
+        return res.status(400).json({ success: false, message: 'At least one item is required' })
+      }
+
+      let subtotal = 0
+      let totalUnits = 0
+
+      const processedItems = items.map((item) => {
+        const qty = Number(item.quantity || 1)
+        const listPrice = Number(item.listPrice || 0)
+        const discountPercentage = Number(item.discountPercentage || 0)
+        const costPrice = Number(item.costPrice ?? item.cost_price ?? 0)
+        const marginPercentage = Number(item.marginPercentage ?? item.margin_percentage ?? 0)
+        const discount = Number(item.discount ?? 0)
+        const discountType = String(item.discountType ?? item.discount_type ?? 'PERCENT').toUpperCase()
+
+        let netPrice = Number(item.price)
+        if (Number.isNaN(netPrice) || netPrice <= 0) {
+          if (costPrice > 0) {
+            const priceAfterMargin = Number((costPrice * (1 + marginPercentage / 100)).toFixed(2))
+            if (discountType === 'FLAT' || discountType === 'RUPEE' || discountType === 'AMOUNT') {
+              netPrice = Number(Math.max(0, priceAfterMargin - discount).toFixed(2))
+            } else {
+              netPrice = Number((priceAfterMargin * (1 - discount / 100)).toFixed(2))
+            }
+          } else {
+            let base = listPrice > 0 ? Number((listPrice * (1 - discountPercentage / 100)).toFixed(2)) : 0
+            if (markupPercentage > 0) {
+              base = Number((base * (1 + markupPercentage / 100)).toFixed(2))
+            }
+            netPrice = base
+          }
+        }
+
+        const lineTotal = Number((netPrice * qty).toFixed(2))
+        subtotal += lineTotal
+        totalUnits += qty
+
+        return {
+          productId: item.productId || null,
+          description: item.description || 'Custom Item',
+          quantity: qty,
+          unit: item.unit || 'Pcs.',
+          listPrice,
+          discountPercentage,
+          costPrice,
+          marginPercentage,
+          discount,
+          discountType,
+          price: netPrice,
+          lineTotal,
+        }
+      })
+
+      const total = Number(subtotal.toFixed(2))
+      totalUnits = Number(totalUnits.toFixed(2))
+
+      let validCustomerId = null
+      if (customerId) {
+        const custCheck = await db.execute({
+          sql: 'SELECT id FROM customers WHERE id = ?',
+          args: [customerId],
+        })
+        if (custCheck.rows.length > 0) {
+          validCustomerId = customerId
+        }
+      }
+
+      let validCustomerTypeId = null
+      if (customerTypeId) {
+        const typeCheck = await db.execute({
+          sql: 'SELECT id FROM customer_types WHERE id = ?',
+          args: [customerTypeId],
+        })
+        if (typeCheck.rows.length > 0) {
+          validCustomerTypeId = customerTypeId
+        }
+      }
+
+      await db.execute({
+        sql: `
+          UPDATE quotations 
+          SET customer_id = ?, customer_type_id = ?, markup_percentage = ?, subtotal = ?, total_units = ?, total = ?
+          WHERE id = ?
+        `,
+        args: [validCustomerId, validCustomerTypeId, markupPercentage, total, totalUnits, total, targetId],
+      })
+
+      await db.execute({
+        sql: `DELETE FROM quotation_items WHERE quotation_id = ?`,
+        args: [targetId],
+      })
+
+      for (const item of processedItems) {
+        let validProductId = null
+        if (item.productId) {
+          const prodCheck = await db.execute({
+            sql: 'SELECT id FROM products WHERE id = ?',
+            args: [item.productId],
+          })
+          if (prodCheck.rows.length > 0) {
+            validProductId = item.productId
+          }
+        }
+
+        await db.execute({
+          sql: `
+            INSERT INTO quotation_items 
+            (quotation_id, product_id, description, quantity, unit, list_price, discount_percentage, cost_price, margin_percentage, discount, discount_type, price, line_total)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          `,
+          args: [
+            targetId,
+            validProductId,
+            item.description,
+            item.quantity,
+            item.unit,
+            item.listPrice,
+            item.discountPercentage,
+            item.costPrice,
+            item.marginPercentage,
+            item.discount,
+            item.discountType,
+            item.price,
+            item.lineTotal,
+          ],
+        })
+      }
+
+      return res.status(200).json({
+        success: true,
+        message: 'Quotation updated successfully',
+        quotation: {
+          id: targetId,
+          quotationNumber: existingQuotationNumber,
+          customerId,
+          customerName,
+          customerPhone,
+          customerTypeId,
+          markupPercentage,
+          subtotal: total,
+          totalUnits,
+          total,
+          items: processedItems,
+        },
+      })
+    } catch (error) {
+      console.error('Update quotation error:', error)
+      return res.status(500).json({ success: false, message: 'Failed to update quotation', error: String(error) })
+    }
+  }
+
   if (method === 'DELETE') {
     try {
       // 1. Single quotation deletion by id

@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react'
-import { Plus, Trash2, Calendar, ChevronDown, Clock, AlertTriangle } from 'lucide-react'
+import { Plus, Trash2, Calendar, ChevronDown, Clock, AlertTriangle, Pencil } from 'lucide-react'
 import type { Quotation } from '../../types'
 import { formatINR } from '../../lib/pricing'
 
@@ -7,6 +7,7 @@ export interface DashboardViewProps {
   quotations: Quotation[]
   onCreateEstimateClick: () => void
   onViewPrintSlip: (quotation: Quotation) => void
+  onEditQuotation?: (quotation: Quotation) => void
   onDeleteQuotation: (quotation: Quotation) => Promise<void> | void
   onPurgeQuotations: (timeline: 'weekly' | 'monthly' | 'all') => Promise<void> | void
 }
@@ -15,6 +16,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   quotations,
   onCreateEstimateClick,
   onViewPrintSlip,
+  onEditQuotation,
   onDeleteQuotation,
   onPurgeQuotations,
 }) => {
@@ -164,6 +166,16 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                     </td>
                     <td className="py-3 px-4 text-center">
                       <div className="flex items-center justify-center gap-1.5">
+                        {onEditQuotation && (
+                          <button
+                            onClick={() => onEditQuotation(q)}
+                            className="inline-flex items-center gap-1 rounded-lg bg-blue-50 px-2.5 py-1 font-bold text-blue-700 hover:bg-blue-100 cursor-pointer transition-colors"
+                            title="Edit this estimate in Estimator"
+                          >
+                            <Pencil className="h-3 w-3" />
+                            <span>Edit</span>
+                          </button>
+                        )}
                         <button
                           onClick={() => onViewPrintSlip(q)}
                           className="rounded-lg bg-slate-100 px-3 py-1 font-bold text-slate-700 hover:bg-slate-200 cursor-pointer transition-colors"

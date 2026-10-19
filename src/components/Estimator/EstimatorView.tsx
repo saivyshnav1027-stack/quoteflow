@@ -47,6 +47,9 @@ export interface EstimatorViewProps {
   onShareWhatsApp: () => void
   onSaveEstimate: () => void
   isSavingQuote: boolean
+  isEditing?: boolean
+  editingEstimateNo?: string
+  onCancelEdit?: () => void
 }
 
 export const EstimatorView: React.FC<EstimatorViewProps> = ({
@@ -75,6 +78,9 @@ export const EstimatorView: React.FC<EstimatorViewProps> = ({
   onShareWhatsApp,
   onSaveEstimate,
   isSavingQuote,
+  isEditing = false,
+  editingEstimateNo,
+  onCancelEdit,
 }) => {
   const [customerSearch, setCustomerSearch] = useState('')
   const [showCustomerDropdown, setShowCustomerDropdown] = useState(false)
@@ -173,6 +179,32 @@ export const EstimatorView: React.FC<EstimatorViewProps> = ({
           </button>
         </div>
       </div>
+
+      {/* Editing Saved Estimate Banner */}
+      {isEditing && (
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-2xl bg-amber-50 border border-amber-200 px-5 py-3.5 text-amber-900 shadow-sm">
+          <div className="flex items-center gap-2.5">
+            <span className="flex h-2.5 w-2.5 rounded-full bg-amber-500 animate-pulse shrink-0" />
+            <div className="text-xs">
+              <span className="font-extrabold text-amber-950">
+                Editing Saved Estimate #{editingEstimateNo || currentEstimateNo}
+              </span>
+              <span className="ml-1.5 text-amber-700">
+                — Modifying this estimate will update the existing database record and slip.
+              </span>
+            </div>
+          </div>
+          {onCancelEdit && (
+            <button
+              type="button"
+              onClick={onCancelEdit}
+              className="self-start sm:self-auto rounded-xl bg-white border border-amber-300 px-3 py-1.5 text-xs font-bold text-amber-900 hover:bg-amber-100 cursor-pointer transition-colors shadow-sm"
+            >
+              Cancel Edit / New Estimate
+            </button>
+          )}
+        </div>
+      )}
 
       {/* Section A: Customer Selector Bar */}
       <div className="relative rounded-2xl bg-white p-5 shadow-sm border border-slate-200/80">
@@ -782,7 +814,15 @@ export const EstimatorView: React.FC<EstimatorViewProps> = ({
                 className="flex items-center gap-2 rounded-xl bg-blue-600 px-5 py-2.5 text-xs font-bold text-white hover:bg-blue-700 transition-colors shadow-md disabled:opacity-50 cursor-pointer"
               >
                 <Check className="h-4 w-4" />
-                <span>{isSavingQuote ? 'Saving...' : 'Save Estimate'}</span>
+                <span>
+                  {isSavingQuote
+                    ? isEditing
+                      ? 'Updating...'
+                      : 'Saving...'
+                    : isEditing
+                    ? 'Update Estimate'
+                    : 'Save Estimate'}
+                </span>
               </button>
             </div>
           </div>
