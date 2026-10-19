@@ -16,6 +16,9 @@ import { CustomerDirectory } from './components/Customers/CustomerDirectory'
 import { AddCustomerModal } from './components/Customers/AddCustomerModal'
 import { AdminSettingsView } from './components/Settings/AdminSettingsView'
 import { PrintSlipModal } from './components/Slip/PrintSlipModal'
+import { ConfirmModal } from './components/Common/ConfirmModal'
+import { EstimateSavedModal } from './components/Common/EstimateSavedModal'
+import { ToastContainer, type ToastMessage } from './components/Common/Toast'
 
 import { INITIAL_PRODUCTS, INITIAL_CUSTOMERS } from './lib/constants'
 
@@ -93,7 +96,41 @@ function App() {
   // Modal Visibility States
   const [showNewCustomerModal, setShowNewCustomerModal] = useState(false)
   const [showNewProductModal, setShowNewProductModal] = useState(false)
+  const [newProductPrefillName, setNewProductPrefillName] = useState('')
+  const [newProductFromEstimator, setNewProductFromEstimator] = useState(false)
   const [editProduct, setEditProduct] = useState<Product | null>(null)
+
+  // Toast Notifications State
+  const [toasts, setToasts] = useState<ToastMessage[]>([])
+  const addToast = (type: 'success' | 'error' | 'info', text: string) => {
+    const id = `${Date.now()}-${Math.random()}`
+    setToasts((prev) => [...prev, { id, type, text }])
+  }
+  const dismissToast = (id: string) => {
+    setToasts((prev) => prev.filter((t) => t.id !== id))
+  }
+
+  // Reusable Confirm Modal State
+  const [confirmModal, setConfirmModal] = useState<{
+    isOpen: boolean
+    title: string
+    message: string
+    confirmText?: string
+    cancelText?: string
+    variant?: 'danger' | 'warning' | 'primary'
+    isLoading?: boolean
+    onConfirm: () => Promise<void> | void
+  } | null>(null)
+
+  // Estimate Saved Confirmation Modal State
+  const [savedModalData, setSavedModalData] = useState<{
+    isOpen: boolean
+    quotationNumber: string
+    customerName: string
+    totalAmount: number
+    totalUnits: number
+    isUpdated: boolean
+  } | null>(null)
 
   // Loaders
   const checkDb = async () => {
@@ -213,7 +250,7 @@ function App() {
   // Save or Update Quotation
   const saveQuotationToBackend = async () => {
     if (estimateRows.length === 0) {
-      alert('Please add at least one product to the estimate.')
+      addToast('info', 'Please add at least one product to the estimate before saving.')
       return
     }
 
@@ -273,6 +310,23 @@ function App() {
           items: estimateRows,
         })
 
+        // Open prominent Estimate Saved confirmation modal
+        setSavedModalData({
+          isOpen: true,
+          quotationNumber: savedQuoteNo,
+          customerName: selectedCustomer.customer_name || 'Guest Walk-In',
+          totalAmount: summary.totalAmount,
+          totalUnits: summary.totalUnits,
+          isUpdated: isUpdating,
+        })
+
+        addToast(
+          'success',
+          isUpdating
+            ? `Estimate #${savedQuoteNo} updated successfully!`
+            : `Estimate #${savedQuoteNo} saved successfully!`
+        )
+
         if (isUpdating) {
           setEditingQuotationId(null)
           setEditingEstimateNo('')
@@ -291,11 +345,11 @@ function App() {
           localStorage.setItem('sri_current_estimate_no', nextNo)
         }
       } else {
-        alert('Failed to save quotation: ' + (data.message || data.error || 'Unknown error'))
+        addToast('error', data.message || data.error || 'Failed to save quotation.')
       }
     } catch (err) {
       console.error(err)
-      alert('Network error while saving quotation.')
+      addToast('error', 'Network error while saving quotation.')
     } finally {
       setIsSavingQuote(false)
     }
@@ -304,7 +358,7 @@ function App() {
   // WhatsApp Share
   const shareViaWhatsApp = () => {
     if (estimateRows.length === 0) {
-      alert('Estimate is empty.')
+      addToast('info', 'Estimate is empty. Add products before sharing.')
       return
     }
 
@@ -319,6 +373,7 @@ function App() {
     })
     window.open(url, '_blank')
     setWhatsappSharedNotice(true)
+    addToast('success', 'WhatsApp share link opened.')
     // Auto-save estimate to database when shared
     saveQuotationToBackend()
   }
@@ -326,15 +381,34 @@ function App() {
   // Clear Estimate
   const clearCurrentEstimate = () => {
     if (editingQuotationId) {
-      if (window.confirm('Cancel editing estimate and start a fresh estimate for the next customer?')) {
-        cancelEditQuotation()
-      }
+      setConfirmModal({
+        isOpen: true,
+        title: 'Cancel Editing?',
+        message: 'Exit edit mode and start a fresh estimate for the next customer? Any unsaved edits will be discarded.',
+        confirmText: 'Cancel Edit & Start Fresh',
+        variant: 'warning',
+        onConfirm: () => {
+          cancelEditQuotation()
+          setConfirmModal(null)
+          addToast('info', 'Edit cancelled. Fresh estimate ready.')
+        },
+      })
       return
     }
     if (estimateRows.length === 0) return
-    if (window.confirm('Clear all items and start a fresh estimate for the next customer?')) {
-      clearCurrentEstimateDirect()
-    }
+
+    setConfirmModal({
+      isOpen: true,
+      title: 'Clear Current Estimate?',
+      message: 'Clear all items and start next sequential estimate for a new customer?',
+      confirmText: 'Clear Estimate',
+      variant: 'warning',
+      onConfirm: () => {
+        clearCurrentEstimateDirect()
+        setConfirmModal(null)
+        addToast('info', 'Estimate cleared. Ready for next customer.')
+      },
+    })
   }
 
   const clearCurrentEstimateDirect = () => {
@@ -474,24 +548,33 @@ function App() {
   }
 
   // Delete & Purge Quotation Handlers
-  const handleDeleteQuotation = async (q: Quotation) => {
-    if (confirm(`Delete estimate #${q.quotation_number} (${q.customer_name}) from the database?`)) {
-      try {
-        const res = await fetch(`${API_BASE}/quotations/${q.id}`, { method: 'DELETE' })
-        const data = await res.json()
-        if (data.success) {
-          loadQuotations()
-        } else {
-          alert('Failed to delete estimate: ' + (data.message || 'Unknown error'))
+  const handleDeleteQuotation = (q: Quotation) => {
+    setConfirmModal({
+      isOpen: true,
+      title: `Delete Estimate #${q.quotation_number}?`,
+      message: `Are you sure you want to delete the estimate for "${q.customer_name}"? All line items and records will be permanently removed.`,
+      confirmText: 'Delete Estimate',
+      variant: 'danger',
+      onConfirm: async () => {
+        try {
+          const res = await fetch(`${API_BASE}/quotations/${q.id}`, { method: 'DELETE' })
+          const data = await res.json()
+          if (data.success) {
+            loadQuotations()
+            addToast('success', `Estimate #${q.quotation_number} deleted.`)
+          } else {
+            addToast('error', data.message || 'Failed to delete estimate.')
+          }
+        } catch {
+          addToast('error', 'Network error while deleting estimate.')
+        } finally {
+          setConfirmModal(null)
         }
-      } catch (e) {
-        console.error(e)
-        alert('Failed to delete estimate')
-      }
-    }
+      },
+    })
   }
 
-  const handlePurgeQuotations = async (timeline: 'weekly' | 'monthly' | 'all') => {
+  const handlePurgeQuotations = (timeline: 'weekly' | 'monthly' | 'all') => {
     const label =
       timeline === 'weekly'
         ? 'older than 7 days (Weekly)'
@@ -499,93 +582,172 @@ function App() {
         ? 'older than 30 days (Monthly)'
         : 'ALL estimate records'
 
-    if (confirm(`Are you sure you want to delete estimates ${label}? This cannot be undone.`)) {
-      try {
-        const res = await fetch(`${API_BASE}/quotations?timeline=${timeline}`, { method: 'DELETE' })
-        const data = await res.json()
-        if (data.success) {
-          alert(`Successfully deleted ${data.deletedCount ?? 0} estimate(s).`)
-          loadQuotations()
-        } else {
-          alert('Failed to purge estimates: ' + (data.message || 'Unknown error'))
+    setConfirmModal({
+      isOpen: true,
+      title: `Purge Estimates: ${timeline.toUpperCase()}`,
+      message: `Are you sure you want to permanently delete estimates ${label}? This cannot be undone.`,
+      confirmText: `Purge ${timeline === 'all' ? 'All Estimates' : 'Estimates'}`,
+      variant: 'danger',
+      onConfirm: async () => {
+        try {
+          const res = await fetch(`${API_BASE}/quotations?timeline=${timeline}`, { method: 'DELETE' })
+          const data = await res.json()
+          if (data.success) {
+            addToast('success', `Cleanup complete: ${data.deletedCount ?? 0} estimate(s) deleted.`)
+            loadQuotations()
+          } else {
+            addToast('error', data.message || 'Failed to purge estimates.')
+          }
+        } catch {
+          addToast('error', 'Network error while purging estimates.')
+        } finally {
+          setConfirmModal(null)
         }
-      } catch (e) {
-        console.error(e)
-        alert('Failed to purge estimates')
-      }
-    }
+      },
+    })
   }
 
   // CRUD Handlers
   const handleCreateCustomer = async (customerName: string, phone: string) => {
-    const res = await fetch(`${API_BASE}/customers`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        customerName,
-        phone,
-        customerTypeId: 1,
-      }),
-    })
-    const data = await res.json()
-    if (data.success) {
-      loadCustomers()
-      setSelectedCustomer(data.customer)
+    try {
+      const res = await fetch(`${API_BASE}/customers`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          customerName,
+          phone,
+          customerTypeId: 1,
+        }),
+      })
+      const data = await res.json()
+      if (data.success) {
+        loadCustomers()
+        if (data.customer) {
+          setSelectedCustomer(data.customer)
+        }
+        setShowNewCustomerModal(false)
+        addToast('success', `Customer "${customerName}" added successfully.`)
+      } else {
+        addToast('error', data.message || 'Failed to add customer.')
+      }
+    } catch {
+      addToast('error', 'Network error while adding customer.')
     }
   }
 
-  const handleDeleteCustomer = async (c: Customer) => {
-    if (confirm(`Delete customer ${c.customer_name}?`)) {
-      await fetch(`${API_BASE}/customers/${c.id}`, { method: 'DELETE' })
-      loadCustomers()
-    }
+  const handleDeleteCustomer = (c: Customer) => {
+    setConfirmModal({
+      isOpen: true,
+      title: `Delete Customer ${c.customer_name}?`,
+      message: `Are you sure you want to remove "${c.customer_name}" from the customer directory?`,
+      confirmText: 'Delete Customer',
+      variant: 'danger',
+      onConfirm: async () => {
+        try {
+          const res = await fetch(`${API_BASE}/customers/${c.id}`, { method: 'DELETE' })
+          const data = await res.json()
+          if (data.success) {
+            loadCustomers()
+            addToast('success', `Customer "${c.customer_name}" deleted.`)
+          } else {
+            addToast('error', data.message || 'Failed to delete customer.')
+          }
+        } catch {
+          addToast('error', 'Network error while deleting customer.')
+        } finally {
+          setConfirmModal(null)
+        }
+      },
+    })
   }
 
-  const handleCreateProduct = async (prod: NewProductData) => {
-    const res = await fetch(`${API_BASE}/products`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        productName: prod.productName,
-        productCode: prod.productCode,
-        unit: prod.unit,
-        listPrice: prod.listPrice,
-        discountPercentage: prod.discountPercentage,
-        costPrice: prod.costPrice,
-        marginPercentage: prod.marginPercentage,
-        stockQuantity: 100,
-      }),
-    })
-    const data = await res.json()
-    if (data.success) {
-      loadProducts()
-      addProductToEstimate(data.product)
+  const handleCreateProduct = async (prod: NewProductData, addToQuote: boolean = false) => {
+    try {
+      const res = await fetch(`${API_BASE}/products`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          productName: prod.productName,
+          productCode: prod.productCode,
+          unit: prod.unit,
+          listPrice: prod.listPrice,
+          discountPercentage: prod.discountPercentage,
+          costPrice: prod.costPrice,
+          marginPercentage: prod.marginPercentage,
+          stockQuantity: 100,
+        }),
+      })
+      const data = await res.json()
+      if (data.success) {
+        loadProducts()
+        setShowNewProductModal(false)
+        if (addToQuote && data.product) {
+          addProductToEstimate(data.product)
+          addToast('success', `Added "${data.product.product_name}" to estimate & catalog.`)
+        } else if (data.product) {
+          addToast('success', `Saved "${data.product.product_name}" to catalog.`)
+        }
+      } else {
+        addToast('error', data.message || 'Failed to create product.')
+      }
+    } catch {
+      addToast('error', 'Network error while creating product.')
     }
   }
 
   const handleEditProduct = async (prod: Product) => {
-    await fetch(`${API_BASE}/products/${prod.id}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        productCode: prod.product_code,
-        productName: prod.product_name,
-        unit: prod.unit,
-        listPrice: prod.list_price,
-        discountPercentage: prod.discount_percentage,
-        costPrice: prod.cost_price,
-        marginPercentage: prod.margin_percentage,
-        stockQuantity: prod.stock_quantity,
-      }),
-    })
-    loadProducts()
+    try {
+      const res = await fetch(`${API_BASE}/products/${prod.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          productCode: prod.product_code,
+          productName: prod.product_name,
+          unit: prod.unit,
+          listPrice: prod.list_price,
+          discountPercentage: prod.discount_percentage,
+          costPrice: prod.cost_price,
+          marginPercentage: prod.margin_percentage,
+          stockQuantity: prod.stock_quantity,
+        }),
+      })
+      const data = await res.json()
+      if (data.success) {
+        loadProducts()
+        setEditProduct(null)
+        addToast('success', `Product "${prod.product_name}" updated.`)
+      } else {
+        addToast('error', data.message || 'Failed to update product.')
+      }
+    } catch {
+      addToast('error', 'Network error while updating product.')
+    }
   }
 
-  const handleDeleteProduct = async (p: Product) => {
-    if (confirm(`Delete ${p.product_name}?`)) {
-      await fetch(`${API_BASE}/products/${p.id}`, { method: 'DELETE' })
-      loadProducts()
-    }
+  const handleDeleteProduct = (p: Product) => {
+    setConfirmModal({
+      isOpen: true,
+      title: `Delete Product ${p.product_name}?`,
+      message: `Are you sure you want to remove SKU "${p.product_code}" from the inventory catalog?`,
+      confirmText: 'Delete Product',
+      variant: 'danger',
+      onConfirm: async () => {
+        try {
+          const res = await fetch(`${API_BASE}/products/${p.id}`, { method: 'DELETE' })
+          const data = await res.json()
+          if (data.success) {
+            loadProducts()
+            addToast('success', `Product "${p.product_name}" deleted.`)
+          } else {
+            addToast('error', data.message || 'Failed to delete product.')
+          }
+        } catch {
+          addToast('error', 'Network error while deleting product.')
+        } finally {
+          setConfirmModal(null)
+        }
+      },
+    })
   }
 
   // Auth Handlers
@@ -663,7 +825,11 @@ function App() {
               onNewCustomerClick={() => setShowNewCustomerModal(true)}
               products={products}
               onAddProductToEstimate={addProductToEstimate}
-              onAddNewProductClick={() => setShowNewProductModal(true)}
+              onAddNewProductClick={(prefillName) => {
+                setNewProductPrefillName(prefillName || '')
+                setNewProductFromEstimator(true)
+                setShowNewProductModal(true)
+              }}
               estimateRows={estimateRows}
               onUpdateRow={updateRow}
               onRemoveRow={removeRow}
@@ -690,7 +856,11 @@ function App() {
             <ProductsCatalog
               products={products}
               enableListPriceMode={enableListPriceMode}
-              onAddProductClick={() => setShowNewProductModal(true)}
+              onAddProductClick={() => {
+                setNewProductPrefillName('')
+                setNewProductFromEstimator(false)
+                setShowNewProductModal(true)
+              }}
               onEditProduct={(p) => setEditProduct(p)}
               onDeleteProduct={handleDeleteProduct}
             />
@@ -721,7 +891,7 @@ function App() {
         </main>
       </div>
 
-      {/* Modals */}
+      {/* Modals & Popups */}
       <PrintSlipModal
         isOpen={showPrintModal}
         data={printQuoteData}
@@ -737,7 +907,12 @@ function App() {
       <AddProductModal
         isOpen={showNewProductModal}
         enableListPriceMode={enableListPriceMode}
-        onClose={() => setShowNewProductModal(false)}
+        initialName={newProductPrefillName}
+        showAddToQuoteOption={newProductFromEstimator}
+        onClose={() => {
+          setShowNewProductModal(false)
+          setNewProductPrefillName('')
+        }}
         onSave={handleCreateProduct}
       />
 
@@ -747,6 +922,53 @@ function App() {
         onClose={() => setEditProduct(null)}
         onSave={handleEditProduct}
       />
+
+      {confirmModal && (
+        <ConfirmModal
+          isOpen={confirmModal.isOpen}
+          title={confirmModal.title}
+          message={confirmModal.message}
+          confirmText={confirmModal.confirmText}
+          cancelText={confirmModal.cancelText}
+          variant={confirmModal.variant}
+          isLoading={confirmModal.isLoading}
+          onConfirm={confirmModal.onConfirm}
+          onCancel={() => setConfirmModal(null)}
+        />
+      )}
+
+      {savedModalData && (
+        <EstimateSavedModal
+          isOpen={savedModalData.isOpen}
+          quotationNumber={savedModalData.quotationNumber}
+          customerName={savedModalData.customerName}
+          totalAmount={savedModalData.totalAmount}
+          totalUnits={savedModalData.totalUnits}
+          isUpdated={savedModalData.isUpdated}
+          onPrint={() => {
+            const quoteNo = savedModalData.quotationNumber
+            setSavedModalData(null)
+            const found = quotations.find((q) => q.quotation_number === quoteNo)
+            if (found) {
+              handleViewQuotationPrintSlip(found)
+            } else {
+              setShowPrintModal(true)
+            }
+          }}
+          onWhatsApp={() => {
+            setSavedModalData(null)
+            shareViaWhatsApp()
+          }}
+          onNextEstimate={() => {
+            setSavedModalData(null)
+            clearCurrentEstimateDirect()
+          }}
+          onClose={() => setSavedModalData(null)}
+        />
+      )}
+
+      {/* Global Toast Container */}
+      <ToastContainer toasts={toasts} onDismiss={dismissToast} />
     </div>
   )
 }

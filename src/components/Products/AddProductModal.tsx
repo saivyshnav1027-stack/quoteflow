@@ -1,5 +1,5 @@
-import React, { useState } from 'react'
-import { X } from 'lucide-react'
+import React, { useState, useEffect } from 'react'
+import { X, Loader2 } from 'lucide-react'
 
 export interface NewProductData {
   productName: string
@@ -14,13 +14,17 @@ export interface NewProductData {
 export interface AddProductModalProps {
   isOpen: boolean
   enableListPriceMode: boolean
+  initialName?: string
+  showAddToQuoteOption?: boolean
   onClose: () => void
-  onSave: (productData: NewProductData) => Promise<void>
+  onSave: (productData: NewProductData, addToQuote: boolean) => Promise<void>
 }
 
 export const AddProductModal: React.FC<AddProductModalProps> = ({
   isOpen,
   enableListPriceMode,
+  initialName = '',
+  showAddToQuoteOption = true,
   onClose,
   onSave,
 }) => {
@@ -31,23 +35,39 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({
   const [discountPercentage, setDiscountPercentage] = useState<number | ''>('')
   const [costPrice, setCostPrice] = useState<number | ''>('')
   const [marginPercentage, setMarginPercentage] = useState<number | ''>(15)
-  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [submittingAction, setSubmittingAction] = useState<'catalog' | 'quote' | null>(null)
+  const [errorMsg, setErrorMsg] = useState('')
+
+  useEffect(() => {
+    if (isOpen) {
+      if (initialName) setName(initialName)
+      setErrorMsg('')
+    }
+  }, [isOpen, initialName])
 
   if (!isOpen) return null
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setIsSubmitting(true)
+  const handleSave = async (addToQuote: boolean) => {
+    if (!name.trim()) {
+      setErrorMsg('Please enter product description/name.')
+      return
+    }
+    setErrorMsg('')
+
+    setSubmittingAction(addToQuote ? 'quote' : 'catalog')
     try {
-      await onSave({
-        productName: name.trim(),
-        productCode: code.trim(),
-        unit,
-        listPrice: Number(listPrice || 0),
-        discountPercentage: Number(discountPercentage || 0),
-        costPrice: Number(costPrice || 0),
-        marginPercentage: Number(marginPercentage || 15),
-      })
+      await onSave(
+        {
+          productName: name.trim(),
+          productCode: code.trim(),
+          unit,
+          listPrice: Number(listPrice || 0),
+          discountPercentage: Number(discountPercentage || 0),
+          costPrice: Number(costPrice || 0),
+          marginPercentage: Number(marginPercentage || 15),
+        },
+        addToQuote
+      )
       setName('')
       setCode('')
       setUnit('Pcs.')
@@ -59,8 +79,13 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({
     } catch (err) {
       console.error(err)
     } finally {
-      setIsSubmitting(false)
+      setSubmittingAction(null)
     }
+  }
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+    handleSave(showAddToQuoteOption)
   }
 
   return (
@@ -76,6 +101,11 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({
             <X className="h-5 w-5" />
           </button>
         </div>
+        {errorMsg && (
+          <div className="mt-3 rounded-xl bg-rose-50 border border-rose-200 px-3.5 py-2 text-xs font-semibold text-rose-700 animate-fade-in">
+            {errorMsg}
+          </div>
+        )}
         <form onSubmit={handleSubmit} className="mt-4 space-y-4">
           <div>
             <label className="block text-xs font-bold text-slate-700 mb-1">
@@ -217,22 +247,35 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({
             </div>
           )}
 
-          <div className="flex justify-end gap-2 pt-2">
+          <div className="flex flex-col-reverse sm:flex-row justify-end gap-2 pt-2">
             <button
               type="button"
               onClick={onClose}
-              disabled={isSubmitting}
-              className="rounded-xl border border-slate-200 px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50 cursor-pointer"
+              disabled={submittingAction !== null}
+              className="rounded-xl border border-slate-200 px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50 cursor-pointer disabled:opacity-50"
             >
               Cancel
             </button>
             <button
-              type="submit"
-              disabled={isSubmitting}
-              className="rounded-xl bg-blue-600 px-5 py-2 text-xs font-bold text-white hover:bg-blue-700 shadow-sm cursor-pointer disabled:opacity-50"
+              type="button"
+              onClick={() => handleSave(false)}
+              disabled={submittingAction !== null}
+              className="flex items-center justify-center gap-1.5 rounded-xl border border-blue-300 bg-blue-50 px-4 py-2 text-xs font-bold text-blue-700 hover:bg-blue-100 shadow-sm cursor-pointer disabled:opacity-50"
             >
-              {isSubmitting ? 'Saving...' : 'Save & Add to Quote'}
+              {submittingAction === 'catalog' && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+              <span>{submittingAction === 'catalog' ? 'Saving...' : 'Save to Catalog'}</span>
             </button>
+            {showAddToQuoteOption && (
+              <button
+                type="button"
+                onClick={() => handleSave(true)}
+                disabled={submittingAction !== null}
+                className="flex items-center justify-center gap-1.5 rounded-xl bg-blue-600 px-5 py-2 text-xs font-bold text-white hover:bg-blue-700 shadow-sm cursor-pointer disabled:opacity-50"
+              >
+                {submittingAction === 'quote' && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+                <span>{submittingAction === 'quote' ? 'Adding...' : 'Save & Add to Quote'}</span>
+              </button>
+            )}
           </div>
         </form>
       </div>

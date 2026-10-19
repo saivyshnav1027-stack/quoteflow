@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { X } from 'lucide-react'
+import { X, Loader2 } from 'lucide-react'
 import type { Product } from '../../types'
 
 export interface EditProductModalProps {
@@ -196,9 +196,10 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({
             <button
               type="submit"
               disabled={isSubmitting}
-              className="rounded-xl bg-blue-600 px-5 py-2 text-xs font-bold text-white hover:bg-blue-700 cursor-pointer shadow-sm disabled:opacity-50"
+              className="flex items-center gap-1.5 rounded-xl bg-blue-600 px-5 py-2 text-xs font-bold text-white hover:bg-blue-700 cursor-pointer shadow-sm disabled:opacity-50"
             >
-              {isSubmitting ? 'Updating...' : 'Update Product'}
+              {isSubmitting && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+              <span>{isSubmitting ? 'Updating...' : 'Update Product'}</span>
             </button>
           </div>
         </form>

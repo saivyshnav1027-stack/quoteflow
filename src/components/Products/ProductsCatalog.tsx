@@ -8,7 +8,7 @@ export interface ProductsCatalogProps {
   enableListPriceMode: boolean
   onAddProductClick: () => void
   onEditProduct: (product: Product) => void
-  onDeleteProduct: (product: Product) => Promise<void>
+  onDeleteProduct: (product: Product) => Promise<void> | void
 }
 
 export const ProductsCatalog: React.FC<ProductsCatalogProps> = ({
