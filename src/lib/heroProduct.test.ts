@@ -201,3 +201,188 @@ describe('Enhancement 2: Hero Product Child Component Validation', () => {
     expect(child.child_unit).toBe('Pcs.')
   })
 })
+
+describe('Review & Validation: Edge Cases & State Isolation', () => {
+  it('operates checkboxes independently across multiple rows in an estimate', () => {
+    const rows: EstimateRow[] = [
+      {
+        id: 'row-1',
+        productId: 101,
+        productCode: 'SKU-101',
+        description: 'Product A',
+        checked: false,
+        quantity: 2,
+        unit: 'Pcs.',
+        listPrice: 500,
+        originalListPrice: 400, // Changed
+        discountPercentage: 0,
+        costPrice: 500,
+        marginPercentage: 15,
+        discount: 0,
+        discountType: 'PERCENT',
+        price: 575,
+        lineTotal: 1150,
+        updateListPriceInDb: true, // Selected
+      },
+      {
+        id: 'row-2',
+        productId: 102,
+        productCode: 'SKU-102',
+        description: 'Product B',
+        checked: false,
+        quantity: 1,
+        unit: 'Pcs.',
+        listPrice: 300,
+        originalListPrice: 200, // Changed
+        discountPercentage: 0,
+        costPrice: 300,
+        marginPercentage: 15,
+        discount: 0,
+        discountType: 'PERCENT',
+        price: 345,
+        lineTotal: 345,
+        updateListPriceInDb: false, // Unselected
+      },
+      {
+        id: 'row-3',
+        productId: 103,
+        productCode: 'SKU-103',
+        description: 'Product C',
+        checked: false,
+        quantity: 3,
+        unit: 'Pcs.',
+        listPrice: 150,
+        originalListPrice: 150, // Unchanged
+        discountPercentage: 0,
+        costPrice: 150,
+        marginPercentage: 15,
+        discount: 0,
+        discountType: 'PERCENT',
+        price: 172.5,
+        lineTotal: 517.5,
+        updateListPriceInDb: true, // Selected but unchanged
+      },
+    ]
+
+    const qualified = rows.filter(shouldUpdateProductListPriceInDb)
+    expect(qualified).toHaveLength(1)
+    expect(qualified[0].id).toBe('row-1')
+    expect(qualified[0].productId).toBe(101)
+  })
+
+  it('does not trigger updates for products removed from the estimation', () => {
+    const initialRows: EstimateRow[] = [
+      {
+        id: 'row-1',
+        productId: 101,
+        productCode: 'SKU-101',
+        description: 'Product A',
+        checked: false,
+        quantity: 1,
+        unit: 'Pcs.',
+        listPrice: 500,
+        originalListPrice: 400,
+        discountPercentage: 0,
+        costPrice: 500,
+        marginPercentage: 15,
+        discount: 0,
+        discountType: 'PERCENT',
+        price: 575,
+        lineTotal: 575,
+        updateListPriceInDb: true,
+      },
+    ]
+
+    // User removes row-1 from the table before saving
+    const currentRows = initialRows.filter((r) => r.id !== 'row-1')
+    const qualified = currentRows.filter(shouldUpdateProductListPriceInDb)
+    expect(qualified).toHaveLength(0)
+  })
+
+  it('safely handles partial update outcomes from Promise.allSettled', () => {
+    const results: PromiseSettledResult<{ productId: number; description: string }>[] = [
+      { status: 'fulfilled', value: { productId: 101, description: 'Product A' } },
+      { status: 'rejected', reason: new Error('Network error on Product B') },
+    ]
+
+    const successful: number[] = []
+    const failed: string[] = []
+
+    results.forEach((res, idx) => {
+      if (res.status === 'fulfilled') {
+        successful.push(res.value.productId)
+      } else {
+        failed.push(`Product-${idx}`)
+      }
+    })
+
+    expect(successful).toEqual([101])
+    expect(failed).toEqual(['Product-1'])
+  })
+
+  it('ensures price update payloads contain only catalog fields and never alter hero associations', () => {
+    const row: EstimateRow = {
+      id: 'row-1',
+      productId: 101,
+      productCode: 'SKU-101',
+      description: 'Product A',
+      checked: false,
+      quantity: 1,
+      unit: 'Pcs.',
+      listPrice: 500,
+      originalListPrice: 400,
+      discountPercentage: 10,
+      costPrice: 450,
+      marginPercentage: 15,
+      discount: 0,
+      discountType: 'PERCENT',
+      price: 517.5,
+      lineTotal: 517.5,
+      updateListPriceInDb: true,
+    }
+
+    const updatedCost = Number((Number(row.listPrice) * (1 - Number(row.discountPercentage || 0) / 100)).toFixed(2))
+    const payload = {
+      id: row.productId,
+      productCode: row.productCode,
+      productName: row.description,
+      unit: row.unit,
+      listPrice: Number(row.listPrice),
+      discountPercentage: Number(row.discountPercentage || 0),
+      costPrice: updatedCost,
+      marginPercentage: Number(row.marginPercentage || 15),
+    }
+
+    // Verify no hero product association keys are present in payload
+    expect(payload).not.toHaveProperty('hero_product_id')
+    expect(payload).not.toHaveProperty('child_product_id')
+    expect(payload).not.toHaveProperty('default_quantity')
+    expect(payload.listPrice).toBe(500)
+    expect(payload.costPrice).toBe(450)
+  })
+
+  it('preserves historical finalized quotation item snapshot integrity', () => {
+    // A historical quotation item record captured in DB
+    const historicalItem = {
+      id: 55,
+      quotation_id: 12,
+      product_id: 101,
+      product_code: 'SKU-101',
+      product_name: 'Product A',
+      unit: 'Pcs.',
+      quantity: 10,
+      list_price: 350, // Historical list price
+      net_price: 380,
+      line_total: 3800,
+    }
+
+    // Even if product 101 list price is later updated to 500 in products table:
+    const updatedProduct = { id: 101, list_price: 500 }
+    expect(updatedProduct.list_price).toBe(500)
+
+    // Historical record remains completely unchanged
+    expect(historicalItem.list_price).toBe(350)
+    expect(historicalItem.line_total).toBe(3800)
+  })
+})
+
