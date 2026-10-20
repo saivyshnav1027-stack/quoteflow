@@ -467,7 +467,6 @@ export const EstimatorView: React.FC<EstimatorViewProps> = ({
               <tr className="bg-slate-100 font-bold uppercase tracking-wider text-slate-600 border-b border-slate-200 select-none">
                 <th className="py-3 px-3 text-center w-12">S.N.</th>
                 <th className="py-3 px-3">Description of Goods</th>
-                <th className="py-3 px-2 text-center w-12">Chek</th>
                 <th className="py-3 px-3 text-right w-24">Qty.</th>
                 <th className="py-3 px-3 w-20">Unit</th>
                 {enableListPriceMode && (
@@ -487,7 +486,7 @@ export const EstimatorView: React.FC<EstimatorViewProps> = ({
               {estimateRows.length === 0 ? (
                 <tr>
                   <td
-                    colSpan={enableListPriceMode ? 12 : 10}
+                    colSpan={enableListPriceMode ? 11 : 9}
                     className="py-12 text-center text-slate-400 text-sm"
                   >
                     No items added to estimate yet. Use the product search bar above to add items.
@@ -503,14 +502,6 @@ export const EstimatorView: React.FC<EstimatorViewProps> = ({
                         value={row.description}
                         onChange={(e) => onUpdateRow(row.id, 'description', e.target.value)}
                         className="w-full rounded bg-transparent px-1 py-0.5 font-semibold text-slate-900 outline-none focus:bg-white focus:ring-1 focus:ring-blue-400"
-                      />
-                    </td>
-                    <td className="py-2.5 px-2 text-center">
-                      <input
-                        type="checkbox"
-                        checked={row.checked}
-                        onChange={(e) => onUpdateRow(row.id, 'checked', e.target.checked)}
-                        className="h-4 w-4 rounded text-blue-600 focus:ring-blue-400"
                       />
                     </td>
                     <td className="py-2.5 px-3 text-right">
