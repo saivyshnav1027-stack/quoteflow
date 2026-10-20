@@ -2,6 +2,10 @@
   "rewrites": [
     { "source": "/api/products/:id", "destination": "/api/products?id=:id" },
     { "source": "/api/customer-types/:id", "destination": "/api/customer-types?id=:id" },
-    { "source": "/api/quotations/:id", "destination": "/api/quotations?id=:id" }
+    { "source": "/api/quotations/:id", "destination": "/api/quotations?id=:id" },
+    { "source": "/api/hero-products/children/:childMappingId", "destination": "/api/hero-products?childMappingId=:childMappingId" },
+    { "source": "/api/hero-products/:id/toggle", "destination": "/api/hero-products?id=:id&action=toggle" },
+    { "source": "/api/hero-products/:id/children", "destination": "/api/hero-products?id=:id&action=children" },
+    { "source": "/api/hero-products/:id", "destination": "/api/hero-products?id=:id" }
   ]
 }

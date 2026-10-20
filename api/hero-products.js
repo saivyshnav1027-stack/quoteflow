@@ -28,12 +28,38 @@ export default async function handler(req, res) {
         UNIQUE (hero_product_id, child_product_id)
       )
     `)
-    await db.execute('ALTER TABLE products ADD COLUMN is_hero INTEGER NOT NULL DEFAULT 0')
   } catch {
-    // Ignore migration exists
+    // Ignore table exists
   }
 
-  const { action, id, childMappingId } = req.query
+  try {
+    await db.execute('ALTER TABLE products ADD COLUMN is_hero INTEGER NOT NULL DEFAULT 0')
+  } catch {
+    // Ignore column exists
+  }
+
+  let { action, id, childMappingId } = req.query || {}
+
+  // Fallback URL parsing for Vercel edge/serverless if query rewrites didn't capture params
+  if (!id && req.url) {
+    const toggleMatch = req.url.match(/\/api\/hero-products\/(\d+)\/toggle/)
+    if (toggleMatch) {
+      id = toggleMatch[1]
+      action = 'toggle'
+    }
+    const childrenMatch = req.url.match(/\/api\/hero-products\/(\d+)\/children/)
+    if (childrenMatch) {
+      id = childrenMatch[1]
+      action = 'children'
+    }
+  }
+
+  if (!childMappingId && req.url) {
+    const childMappingMatch = req.url.match(/\/api\/hero-products\/children\/(\d+)/)
+    if (childMappingMatch) {
+      childMappingId = childMappingMatch[1]
+    }
+  }
 
   if (method === 'GET') {
     try {
