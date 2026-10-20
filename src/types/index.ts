@@ -17,6 +17,26 @@ export interface Product {
   cost_price: number
   margin_percentage: number
   stock_quantity: number
+  is_hero?: boolean | number
+}
+
+export interface HeroProductChild {
+  id: number
+  hero_product_id: number
+  child_product_id: number
+  default_quantity: number
+  created_at?: string
+  child_product_name?: string
+  child_product_code?: string
+  child_unit?: string
+  child_cost_price?: number
+  child_list_price?: number
+  child_discount_percentage?: number
+  child_margin_percentage?: number
+}
+
+export interface HeroProductWithChildren extends Product {
+  children: HeroProductChild[]
 }
 
 export interface EstimateRow {
@@ -35,6 +55,8 @@ export interface EstimateRow {
   discountType: 'PERCENT' | 'RUPEE'
   price: number // Net Price per unit
   lineTotal: number
+  updateListPriceInDb?: boolean
+  originalListPrice?: number
 }
 
 export interface Quotation {
@@ -60,4 +82,5 @@ export interface PrintQuoteData {
   items: EstimateRow[]
 }
 
-export type ActivePage = 'Dashboard' | 'Estimator' | 'Products' | 'Customers' | 'Settings'
+export type ActivePage = 'Dashboard' | 'Estimator' | 'Products' | 'HeroProducts' | 'Customers' | 'Settings'
+

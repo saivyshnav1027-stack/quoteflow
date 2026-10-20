@@ -80,7 +80,26 @@ export async function initSchema() {
     )
   `)
 
+  // 6. Hero Product Children (Bundles/Mappings)
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS hero_product_children (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      hero_product_id INTEGER NOT NULL,
+      child_product_id INTEGER NOT NULL,
+      default_quantity REAL NOT NULL DEFAULT 1.0,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (hero_product_id) REFERENCES products(id) ON DELETE CASCADE,
+      FOREIGN KEY (child_product_id) REFERENCES products(id) ON DELETE CASCADE,
+      UNIQUE (hero_product_id, child_product_id)
+    )
+  `)
+
   // Run backward-compatible column migrations if tables existed previously
+  try {
+    await db.execute('ALTER TABLE products ADD COLUMN is_hero INTEGER NOT NULL DEFAULT 0')
+  } catch {
+    // column already exists
+  }
   try {
     await db.execute('ALTER TABLE products ADD COLUMN margin_percentage REAL NOT NULL DEFAULT 15.0')
   } catch {

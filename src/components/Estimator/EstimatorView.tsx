@@ -10,9 +10,11 @@ import {
   Printer,
   Share2,
   Check,
+  Layers,
 } from 'lucide-react'
-import type { Customer, Product, EstimateRow } from '../../types'
+import type { Customer, Product, EstimateRow, HeroProductWithChildren } from '../../types'
 import { formatINR } from '../../lib/pricing'
+import { AddChildToHeroModal } from './AddChildToHeroModal'
 
 export interface EstimatorSummary {
   itemCount: number
@@ -47,6 +49,8 @@ export interface EstimatorViewProps {
   isEditing?: boolean
   editingEstimateNo?: string
   onCancelEdit?: () => void
+  heroProducts?: HeroProductWithChildren[]
+  onLinkChildToHero?: (heroProductId: number, childProductId: number, defaultQuantity: number) => Promise<boolean>
 }
 
 export const EstimatorView: React.FC<EstimatorViewProps> = ({
@@ -75,11 +79,14 @@ export const EstimatorView: React.FC<EstimatorViewProps> = ({
   isEditing = false,
   editingEstimateNo,
   onCancelEdit,
+  heroProducts = [],
+  onLinkChildToHero,
 }) => {
   const [customerSearch, setCustomerSearch] = useState('')
   const [showCustomerDropdown, setShowCustomerDropdown] = useState(false)
   const [productSearch, setProductSearch] = useState('')
   const [showProductDropdown, setShowProductDropdown] = useState(false)
+  const [addChildModalTarget, setAddChildModalTarget] = useState<EstimateRow | null>(null)
 
   const customerContainerRef = useRef<HTMLDivElement>(null)
   const productContainerRef = useRef<HTMLDivElement>(null)
@@ -389,7 +396,14 @@ export const EstimatorView: React.FC<EstimatorViewProps> = ({
                           className="flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm hover:bg-blue-50 transition-colors cursor-pointer"
                         >
                           <div className="flex flex-col">
-                            <span className="font-semibold text-slate-800">{p.product_name}</span>
+                            <div className="flex items-center gap-1.5">
+                              <span className="font-semibold text-slate-800">{p.product_name}</span>
+                              {Boolean(p.is_hero) && (
+                                <span className="rounded-md bg-amber-100 text-amber-800 px-1.5 py-0.5 text-[10px] font-extrabold uppercase tracking-wide">
+                                  ⭐ Hero Bundle
+                                </span>
+                              )}
+                            </div>
                             <span className="text-xs text-slate-400">
                               Code: {p.product_code} | Unit: {p.unit}
                             </span>
@@ -538,6 +552,22 @@ export const EstimatorView: React.FC<EstimatorViewProps> = ({
                             }
                             className="w-20 rounded border border-slate-200 bg-white px-2 py-1 text-right font-semibold text-slate-700 outline-none focus:border-blue-500"
                           />
+                          {row.productId && (
+                            <label
+                              className="flex items-center justify-end gap-1 mt-1 text-[10px] text-slate-500 font-semibold cursor-pointer select-none hover:text-blue-600"
+                              title="Update List Price in Database when saving estimate"
+                            >
+                              <input
+                                type="checkbox"
+                                checked={!!row.updateListPriceInDb}
+                                onChange={(e) =>
+                                  onUpdateRow(row.id, 'updateListPriceInDb', e.target.checked)
+                                }
+                                className="h-3 w-3 rounded text-blue-600 focus:ring-blue-400 cursor-pointer"
+                              />
+                              <span>Save to DB</span>
+                            </label>
+                          )}
                         </td>
                         <td className="py-2.5 px-3 text-right">
                           <input
@@ -594,13 +624,25 @@ export const EstimatorView: React.FC<EstimatorViewProps> = ({
                     </td>
 
                     <td className="py-2.5 px-2 text-center">
-                      <button
-                        onClick={() => onRemoveRow(row.id)}
-                        className="p-1 text-slate-400 hover:text-red-600 transition-colors cursor-pointer"
-                        title="Remove item"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </button>
+                      <div className="flex items-center justify-center gap-1">
+                        {row.productId && onLinkChildToHero && (
+                          <button
+                            type="button"
+                            onClick={() => setAddChildModalTarget(row)}
+                            className="p-1 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors cursor-pointer"
+                            title="Add as Child Component to Hero Product"
+                          >
+                            <Layers className="h-4 w-4" />
+                          </button>
+                        )}
+                        <button
+                          onClick={() => onRemoveRow(row.id)}
+                          className="p-1 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors cursor-pointer"
+                          title="Remove item"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))
@@ -745,6 +787,18 @@ export const EstimatorView: React.FC<EstimatorViewProps> = ({
           </div>
         </div>
       </div>
+
+      {/* Add Child Component to Hero Product Modal */}
+      {onLinkChildToHero && (
+        <AddChildToHeroModal
+          isOpen={addChildModalTarget !== null}
+          onClose={() => setAddChildModalTarget(null)}
+          targetRow={addChildModalTarget}
+          heroProducts={heroProducts}
+          allProducts={products}
+          onLinkChild={onLinkChildToHero}
+        />
+      )}
     </div>
   )
 }

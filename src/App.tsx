@@ -1,6 +1,6 @@
 import { useEffect, useState, useMemo } from 'react'
 import { CheckCircle2 } from 'lucide-react'
-import type { Customer, Product, EstimateRow, Quotation, PrintQuoteData, ActivePage } from './types'
+import type { Customer, Product, EstimateRow, Quotation, PrintQuoteData, ActivePage, HeroProductWithChildren } from './types'
 import { calculateRow as calcRow, calculateTotals } from './lib/pricing'
 import { getWhatsAppShareUrl } from './lib/whatsapp'
 import { getNextEstimateNumber, incrementEstimateNumber, getTodayDatePrefix } from './lib/estimateNumber'
@@ -10,6 +10,7 @@ import { Sidebar } from './components/Layout/Sidebar'
 import { DashboardView } from './components/Dashboard/DashboardView'
 import { EstimatorView } from './components/Estimator/EstimatorView'
 import { ProductsCatalog } from './components/Products/ProductsCatalog'
+import { HeroProductsView } from './components/HeroProducts/HeroProductsView'
 import { AddProductModal, type NewProductData } from './components/Products/AddProductModal'
 import { EditProductModal } from './components/Products/EditProductModal'
 import { CustomerDirectory } from './components/Customers/CustomerDirectory'
@@ -55,6 +56,7 @@ function App() {
 
   // Global Data
   const [products, setProducts] = useState<Product[]>(INITIAL_PRODUCTS)
+  const [heroProducts, setHeroProducts] = useState<HeroProductWithChildren[]>([])
   const [customers, setCustomers] = useState<Customer[]>(INITIAL_CUSTOMERS)
   const [quotations, setQuotations] = useState<Quotation[]>([])
   const [dbStatus, setDbStatus] = useState<{ isConnected: boolean; isUsingTurso: boolean; message: string }>({
@@ -163,6 +165,20 @@ function App() {
     }
   }
 
+  const loadHeroProducts = async () => {
+    try {
+      const res = await fetch(`${API_BASE}/hero-products`)
+      if (res.ok) {
+        const data = await res.json()
+        if (Array.isArray(data)) {
+          setHeroProducts(data)
+        }
+      }
+    } catch (e) {
+      console.error(e)
+    }
+  }
+
   const loadQuotations = async () => {
     try {
       const res = await fetch(`${API_BASE}/quotations`)
@@ -182,14 +198,102 @@ function App() {
     checkDb()
     loadCustomers()
     loadProducts()
+    loadHeroProducts()
     loadQuotations()
   }, [])
+
+  // Hero Products Handlers
+  const handleToggleHeroProduct = async (product: Product) => {
+    try {
+      const res = await fetch(`${API_BASE}/hero-products/${product.id}/toggle`, {
+        method: 'POST',
+      })
+      const data = await res.json()
+      if (data.success) {
+        addToast('success', data.message)
+        setProducts((prev) =>
+          prev.map((p) => (p.id === product.id ? { ...p, is_hero: data.is_hero ? 1 : 0 } : p))
+        )
+        loadHeroProducts()
+      } else {
+        addToast('error', data.message || 'Failed to toggle Hero status.')
+      }
+    } catch {
+      addToast('error', 'Network error toggling Hero status.')
+    }
+  }
+
+  const handleLinkChildToHero = async (
+    heroProductId: number,
+    childProductId: number,
+    defaultQuantity: number
+  ): Promise<boolean> => {
+    try {
+      const res = await fetch(`${API_BASE}/hero-products/${heroProductId}/children`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ childProductId, defaultQuantity }),
+      })
+      const data = await res.json()
+      if (data.success) {
+        addToast('success', data.message)
+        loadHeroProducts()
+        loadProducts()
+        return true
+      } else {
+        addToast('error', data.message || 'Failed to link child component.')
+        return false
+      }
+    } catch {
+      addToast('error', 'Network error linking child component.')
+      return false
+    }
+  }
+
+  const handleUpdateChildQuantity = async (childMappingId: number, defaultQuantity: number) => {
+    try {
+      const res = await fetch(`${API_BASE}/hero-products/children/${childMappingId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ defaultQuantity }),
+      })
+      const data = await res.json()
+      if (data.success) {
+        addToast('success', 'Default quantity updated.')
+        loadHeroProducts()
+      } else {
+        addToast('error', data.message || 'Failed to update quantity.')
+      }
+    } catch {
+      addToast('error', 'Network error updating quantity.')
+    }
+  }
+
+  const handleDeleteChildFromHero = async (childMappingId: number) => {
+    try {
+      const res = await fetch(`${API_BASE}/hero-products/children/${childMappingId}`, {
+        method: 'DELETE',
+      })
+      const data = await res.json()
+      if (data.success) {
+        addToast('info', 'Child component unlinked from Hero Product.')
+        loadHeroProducts()
+      } else {
+        addToast('error', data.message || 'Failed to unlink child component.')
+      }
+    } catch {
+      addToast('error', 'Network error unlinking child component.')
+    }
+  }
 
   // Estimator Calculations via pure engine
   const addProductToEstimate = (prod: Product) => {
     const cost = Number(prod.cost_price || 0)
     const margin = Number(prod.margin_percentage ?? 15)
-    const newRow: EstimateRow = calcRow(
+
+    const rowsToAdd: EstimateRow[] = []
+
+    const primaryRow: EstimateRow = calcRow(
       {
         id: `${Date.now()}-${Math.floor(Math.random() * 10000)}`,
         productId: prod.id,
@@ -206,10 +310,51 @@ function App() {
         discountType: 'PERCENT',
         price: 0,
         lineTotal: 0,
+        updateListPriceInDb: false,
+        originalListPrice: prod.list_price || 0,
       },
       enableListPriceMode
     )
-    setEstimateRows((prev) => [...prev, newRow])
+    rowsToAdd.push(primaryRow)
+
+    // Check if this is a Hero Product with child components
+    const heroRecord = heroProducts.find((h) => h.id === prod.id)
+    if (heroRecord && heroRecord.children && heroRecord.children.length > 0) {
+      heroRecord.children.forEach((child, cIdx) => {
+        const childProd = products.find((p) => p.id === child.child_product_id)
+        const childCost = childProd ? Number(childProd.cost_price || 0) : Number(child.child_cost_price || 0)
+        const childMargin = childProd ? Number(childProd.margin_percentage ?? 15) : Number(child.child_margin_percentage ?? 15)
+        const childList = childProd ? Number(childProd.list_price || 0) : Number(child.child_list_price || 0)
+        const childDis = childProd ? Number(childProd.discount_percentage || 0) : Number(child.child_discount_percentage || 0)
+
+        const childRow: EstimateRow = calcRow(
+          {
+            id: `${Date.now()}-${cIdx}-${Math.floor(Math.random() * 10000)}`,
+            productId: child.child_product_id,
+            productCode: child.child_product_code || childProd?.product_code || '',
+            description: child.child_product_name || childProd?.product_name || 'Child Item',
+            checked: false,
+            quantity: child.default_quantity || 1,
+            unit: child.child_unit || childProd?.unit || 'Pcs.',
+            listPrice: childList,
+            discountPercentage: childDis,
+            costPrice: childCost,
+            marginPercentage: childMargin,
+            discount: 0,
+            discountType: 'PERCENT',
+            price: 0,
+            lineTotal: 0,
+            updateListPriceInDb: false,
+            originalListPrice: childList,
+          },
+          enableListPriceMode
+        )
+        rowsToAdd.push(childRow)
+      })
+      addToast('info', `Added Hero Product "${prod.product_name}" and ${heroRecord.children.length} bundle items to estimate.`)
+    }
+
+    setEstimateRows((prev) => [...prev, ...rowsToAdd])
   }
 
   const updateRow = (id: string, field: keyof EstimateRow, val: any) => {
@@ -274,6 +419,76 @@ function App() {
 
       const data = await res.json()
       if (data.success) {
+        // Handle selective List Price updates to database
+        const rowsToUpdate = estimateRows.filter(
+          (r) =>
+            r.productId !== null &&
+            r.updateListPriceInDb === true &&
+            Number(r.listPrice || 0) > 0 &&
+            Number(r.listPrice) !== Number(r.originalListPrice)
+        )
+
+        if (rowsToUpdate.length > 0) {
+          const updateResults = await Promise.allSettled(
+            rowsToUpdate.map(async (row) => {
+              const updatedCost = Number(
+                (Number(row.listPrice) * (1 - Number(row.discountPercentage || 0) / 100)).toFixed(2)
+              )
+              const prodRes = await fetch(`${API_BASE}/products/${row.productId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  id: row.productId,
+                  productCode: row.productCode,
+                  productName: row.description,
+                  unit: row.unit,
+                  listPrice: Number(row.listPrice),
+                  discountPercentage: Number(row.discountPercentage || 0),
+                  costPrice: updatedCost,
+                  marginPercentage: Number(row.marginPercentage || 15),
+                }),
+              })
+              if (!prodRes.ok) throw new Error(`Failed to update ${row.description}`)
+              return {
+                productId: row.productId as number,
+                listPrice: Number(row.listPrice),
+                costPrice: updatedCost,
+              }
+            })
+          )
+
+          const successfulUpdates: { productId: number; listPrice: number; costPrice: number }[] = []
+          const failedUpdates: string[] = []
+
+          updateResults.forEach((res, idx) => {
+            if (res.status === 'fulfilled') {
+              successfulUpdates.push(res.value)
+            } else {
+              failedUpdates.push(rowsToUpdate[idx].description)
+            }
+          })
+
+          if (successfulUpdates.length > 0) {
+            setProducts((prev) =>
+              prev.map((p) => {
+                const match = successfulUpdates.find((u) => u.productId === p.id)
+                if (match) {
+                  return { ...p, list_price: match.listPrice, cost_price: match.costPrice }
+                }
+                return p
+              })
+            )
+            addToast(
+              'success',
+              `Saved updated List Price to database for ${successfulUpdates.length} product(s).`
+            )
+          }
+
+          if (failedUpdates.length > 0) {
+            addToast('error', `Failed to update database List Price for: ${failedUpdates.join(', ')}`)
+          }
+        }
+
         const savedQuoteNo = data.quotation?.quotationNumber || (isUpdating ? editingEstimateNo : currentEstimateNo)
         setSaveSuccessMsg(
           isUpdating
@@ -756,6 +971,7 @@ function App() {
         setActivePage={setActivePage}
         productCount={products.length}
         customerCount={customers.length}
+        heroProductCount={heroProducts.length}
         dbStatus={dbStatus}
         onLogout={handleLogout}
       />
@@ -829,6 +1045,8 @@ function App() {
               isEditing={editingQuotationId !== null}
               editingEstimateNo={editingEstimateNo}
               onCancelEdit={cancelEditQuotation}
+              heroProducts={heroProducts}
+              onLinkChildToHero={handleLinkChildToHero}
             />
           )}
 
@@ -843,6 +1061,19 @@ function App() {
               }}
               onEditProduct={(p) => setEditProduct(p)}
               onDeleteProduct={handleDeleteProduct}
+              onToggleHero={handleToggleHeroProduct}
+            />
+          )}
+
+          {activePage === 'HeroProducts' && (
+            <HeroProductsView
+              heroProducts={heroProducts}
+              allProducts={products}
+              onToggleHero={handleToggleHeroProduct}
+              onAddChild={handleLinkChildToHero}
+              onUpdateChildQuantity={handleUpdateChildQuantity}
+              onDeleteChild={handleDeleteChildFromHero}
+              onNavigateToProducts={() => setActivePage('Products')}
             />
           )}
 

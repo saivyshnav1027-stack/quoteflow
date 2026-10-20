@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { Plus, Pencil, Trash2 } from 'lucide-react'
+import { Plus, Pencil, Trash2, Sparkles } from 'lucide-react'
 import type { Product } from '../../types'
 import { formatINR } from '../../lib/pricing'
 
@@ -9,6 +9,7 @@ export interface ProductsCatalogProps {
   onAddProductClick: () => void
   onEditProduct: (product: Product) => void
   onDeleteProduct: (product: Product) => Promise<void> | void
+  onToggleHero?: (product: Product) => Promise<void> | void
 }
 
 export const ProductsCatalog: React.FC<ProductsCatalogProps> = ({
@@ -17,6 +18,7 @@ export const ProductsCatalog: React.FC<ProductsCatalogProps> = ({
   onAddProductClick,
   onEditProduct,
   onDeleteProduct,
+  onToggleHero,
 }) => {
   const [search, setSearch] = useState('')
 
@@ -71,6 +73,7 @@ export const ProductsCatalog: React.FC<ProductsCatalogProps> = ({
                 )}
                 <th className="py-3 px-4 text-right">Cost Price (₹)</th>
                 <th className="py-3 px-3 text-right">Margin%</th>
+                <th className="py-3 px-3 text-center">Hero Item</th>
                 <th className="py-3 px-4 text-center">Actions</th>
               </tr>
             </thead>
@@ -99,6 +102,37 @@ export const ProductsCatalog: React.FC<ProductsCatalogProps> = ({
                     <span className="rounded-full bg-blue-50 px-2.5 py-0.5 text-xs font-bold text-blue-700">
                       +{p.margin_percentage ?? 15}%
                     </span>
+                  </td>
+                  <td className="py-3 px-3 text-center">
+                    {onToggleHero ? (
+                      <button
+                        type="button"
+                        onClick={() => onToggleHero(p)}
+                        className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-bold transition-all cursor-pointer ${
+                          Boolean(p.is_hero)
+                            ? 'bg-amber-100 text-amber-900 border border-amber-300 shadow-xs'
+                            : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+                        }`}
+                        title={
+                          Boolean(p.is_hero)
+                            ? 'Click to unmark as Hero Product'
+                            : 'Click to make this a Hero Product for bundles'
+                        }
+                      >
+                        <Sparkles
+                          className={`h-3 w-3 ${
+                            Boolean(p.is_hero) ? 'text-amber-600 fill-amber-500' : 'text-slate-400'
+                          }`}
+                        />
+                        <span>{Boolean(p.is_hero) ? 'Hero' : 'Set Hero'}</span>
+                      </button>
+                    ) : (
+                      Boolean(p.is_hero) && (
+                        <span className="rounded-full bg-amber-100 text-amber-900 px-2 py-0.5 text-[10px] font-extrabold">
+                          ⭐ Hero
+                        </span>
+                      )
+                    )}
                   </td>
                   <td className="py-3 px-4 text-center">
                     <button

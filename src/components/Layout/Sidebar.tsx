@@ -8,6 +8,7 @@ import {
   SlidersHorizontal,
   Database,
   LogOut,
+  Sparkles,
 } from 'lucide-react'
 import type { ActivePage } from '../../types'
 
@@ -16,6 +17,7 @@ export interface SidebarProps {
   setActivePage: (page: ActivePage) => void
   productCount: number
   customerCount: number
+  heroProductCount?: number
   dbStatus: { isUsingTurso: boolean }
   onLogout: () => void
 }
@@ -25,6 +27,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   setActivePage,
   productCount,
   customerCount,
+  heroProductCount,
   dbStatus,
   onLogout,
 }) => {
@@ -84,6 +87,18 @@ export const Sidebar: React.FC<SidebarProps> = ({
             >
               <Package className="h-4 w-4" />
               <span>Products ({productCount})</span>
+            </button>
+
+            <button
+              onClick={() => setActivePage('HeroProducts')}
+              className={`flex items-center gap-3 rounded-xl px-3.5 py-2.5 text-sm font-semibold transition-all cursor-pointer ${
+                activePage === 'HeroProducts'
+                  ? 'bg-blue-600 text-white shadow-md shadow-blue-900/40'
+                  : 'text-slate-300 hover:bg-slate-800/60 hover:text-white'
+              }`}
+            >
+              <Sparkles className="h-4 w-4 text-amber-400" />
+              <span>Hero Products {heroProductCount !== undefined && `(${heroProductCount})`}</span>
             </button>
 
             <button

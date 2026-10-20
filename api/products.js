@@ -17,7 +17,7 @@ export default async function handler(req, res) {
   if (method === 'GET') {
     try {
       const result = await db.execute(`
-        SELECT id, product_code, product_name, unit, list_price, discount_percentage, cost_price, COALESCE(margin_percentage, 15.0) as margin_percentage, stock_quantity
+        SELECT id, product_code, product_name, unit, list_price, discount_percentage, cost_price, COALESCE(margin_percentage, 15.0) as margin_percentage, stock_quantity, COALESCE(is_hero, 0) as is_hero
         FROM products
         ORDER BY product_name ASC
       `)
