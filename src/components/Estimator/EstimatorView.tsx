@@ -12,16 +12,9 @@ import {
   Check,
   Layers,
 } from 'lucide-react'
-import type { Customer, Product, EstimateRow, HeroProductWithChildren } from '../../types'
+import type { Customer, Product, EstimateRow, HeroProductWithChildren, EstimatorSummary } from '../../types'
 import { formatINR } from '../../lib/pricing'
 import { AddChildToHeroModal } from './AddChildToHeroModal'
-
-export interface EstimatorSummary {
-  itemCount: number
-  totalUnits: number
-  totalSavings: number
-  totalAmount: number
-}
 
 export interface EstimatorViewProps {
   currentEstimateNo: string
@@ -37,6 +30,8 @@ export interface EstimatorViewProps {
   onUpdateRow: (id: string, field: keyof EstimateRow, value: any) => void
   onRemoveRow: (id: string) => void
   summary: EstimatorSummary
+  cashDiscount?: number
+  onCashDiscountChange?: (val: number) => void
   enableListPriceMode: boolean
   whatsappSharedNotice: boolean
   onDismissWhatsAppNotice: () => void
@@ -67,6 +62,8 @@ export const EstimatorView: React.FC<EstimatorViewProps> = ({
   onUpdateRow,
   onRemoveRow,
   summary,
+  cashDiscount = 0,
+  onCashDiscountChange,
   enableListPriceMode,
   whatsappSharedNotice,
   onDismissWhatsAppNotice,
@@ -462,24 +459,24 @@ export const EstimatorView: React.FC<EstimatorViewProps> = ({
 
         {/* Estimate Line Items Table */}
         <div className="overflow-x-auto rounded-xl border border-slate-200">
-          <table className="w-full text-left text-xs border-collapse">
+          <table className="w-full text-left text-xs border-collapse min-w-[1050px]">
             <thead>
               <tr className="bg-slate-100 font-bold uppercase tracking-wider text-slate-600 border-b border-slate-200 select-none">
-                <th className="py-3 px-3 text-center w-12">S.N.</th>
-                <th className="py-3 px-3">Description of Goods</th>
-                <th className="py-3 px-3 text-right w-24">Qty.</th>
-                <th className="py-3 px-3 w-20">Unit</th>
+                <th className="py-3 px-3 text-center w-12 text-[11px]">S.N.</th>
+                <th className="py-3 px-3 min-w-[200px] text-[11px]">Description of Goods</th>
+                <th className="py-3 px-3 text-right w-20 text-[11px]">Qty.</th>
+                <th className="py-3 px-2 text-center w-20 text-[11px]">Unit</th>
                 {enableListPriceMode && (
                   <>
-                    <th className="py-3 px-3 text-right w-24">List Price (₹)</th>
-                    <th className="py-3 px-3 text-right w-20">Trade Dis%</th>
+                    <th className="py-3 px-3 text-right w-24 text-[11px]">List Price (₹)</th>
+                    <th className="py-3 px-3 text-right w-20 text-[11px]">Trade Dis%</th>
                   </>
                 )}
-                <th className="py-3 px-3 text-right w-28">Cost Price (₹)</th>
-                <th className="py-3 px-3 text-right w-20">Margin%</th>
-                <th className="py-3 px-3 text-right w-28">Net Price</th>
-                <th className="py-3 px-3 text-right w-32">Amount (₹)</th>
-                <th className="py-3 px-2 text-center w-12">Action</th>
+                <th className="py-3 px-3 text-right w-24 text-[11px]">Cost Price (₹)</th>
+                <th className="py-3 px-3 text-right w-20 text-[11px]">Margin%</th>
+                <th className="py-3 px-3 text-right w-28 text-[11px]">Net Price (₹)</th>
+                <th className="py-3 px-3 text-right w-32 text-[11px]">Amount (₹)</th>
+                <th className="py-3 px-3 text-center w-24 text-[11px]">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 text-slate-800 font-medium">
@@ -516,7 +513,7 @@ export const EstimatorView: React.FC<EstimatorViewProps> = ({
                         className="w-20 rounded border border-slate-200 bg-white px-2 py-1 text-right font-bold text-slate-900 outline-none focus:border-blue-500"
                       />
                     </td>
-                    <td className="py-2.5 px-3">
+                    <td className="py-2.5 px-2 text-center">
                       <select
                         value={row.unit}
                         onChange={(e) => onUpdateRow(row.id, 'unit', e.target.value)}
@@ -543,28 +540,6 @@ export const EstimatorView: React.FC<EstimatorViewProps> = ({
                             }
                             className="w-20 rounded border border-slate-200 bg-white px-2 py-1 text-right font-semibold text-slate-700 outline-none focus:border-blue-500"
                           />
-                          {row.productId && (
-                            <label
-                              className={`flex items-center justify-end gap-1 mt-1 text-[10px] font-semibold cursor-pointer select-none transition-colors ${
-                                row.updateListPriceInDb ? 'text-amber-600 font-bold' : 'text-slate-500 hover:text-blue-600'
-                              }`}
-                              title={
-                                row.updateListPriceInDb
-                                  ? 'Marked to permanently update List Price in Database upon save'
-                                  : 'Update List Price in Database when saving estimate'
-                              }
-                            >
-                              <input
-                                type="checkbox"
-                                checked={!!row.updateListPriceInDb}
-                                onChange={(e) =>
-                                  onUpdateRow(row.id, 'updateListPriceInDb', e.target.checked)
-                                }
-                                className="h-3 w-3 rounded text-amber-600 focus:ring-amber-400 cursor-pointer"
-                              />
-                              <span>{row.updateListPriceInDb ? '⚠️ Save to DB' : 'Save to DB'}</span>
-                            </label>
-                          )}
                         </td>
                         <td className="py-2.5 px-3 text-right">
                           <input
@@ -607,21 +582,59 @@ export const EstimatorView: React.FC<EstimatorViewProps> = ({
                           onUpdateRow(row.id, 'marginPercentage', parseFloat(e.target.value) || 0)
                         }
                         className="w-16 rounded border border-blue-200 bg-blue-50/50 px-2 py-1 text-right font-bold text-blue-700 outline-none focus:border-blue-500"
+                        title="Margin % on Cost Price"
                       />
                     </td>
 
-                    {/* Net Price */}
-                    <td className="py-2.5 px-3 text-right font-bold text-blue-700">
-                      {formatINR(row.price)}
+                    {/* Net Price (Interactive input for Case 2) */}
+                    <td className="py-2.5 px-3 text-right">
+                      <input
+                        type="number"
+                        step="0.01"
+                        value={row.price}
+                        onChange={(e) =>
+                          onUpdateRow(row.id, 'price', parseFloat(e.target.value) || 0)
+                        }
+                        className="w-24 rounded border border-slate-200 bg-white px-2 py-1 text-right font-mono font-bold text-blue-900 outline-none focus:border-blue-500 focus:bg-blue-50/30"
+                        title="Direct Net Price (auto updates Margin %)"
+                      />
                     </td>
 
                     {/* Amount */}
-                    <td className="py-2.5 px-3 text-right font-black text-slate-900">
+                    <td className="py-2.5 px-3 text-right font-mono font-black text-slate-900">
                       {formatINR(row.lineTotal)}
                     </td>
 
-                    <td className="py-2.5 px-2 text-center">
-                      <div className="flex items-center justify-center gap-1">
+                    <td className="py-2.5 px-3 text-center">
+                      <div className="flex items-center justify-center gap-1.5">
+                        {row.productId && (
+                          <label
+                            className="group relative flex items-center cursor-pointer select-none"
+                            title={
+                              row.updateListPriceInDb
+                                ? 'Marked: Will update revised pricing (List, Dis, Cost, Margin) to Catalog DB on save'
+                                : 'Update revised pricing to Catalog DB on save'
+                            }
+                          >
+                            <input
+                              type="checkbox"
+                              checked={!!row.updateListPriceInDb}
+                              onChange={(e) =>
+                                onUpdateRow(row.id, 'updateListPriceInDb', e.target.checked)
+                              }
+                              className="peer sr-only"
+                            />
+                            <span
+                              className={`px-1.5 py-0.5 text-[10px] font-extrabold rounded border transition-all ${
+                                row.updateListPriceInDb
+                                  ? 'bg-amber-100 text-amber-800 border-amber-300 shadow-xs'
+                                  : 'bg-slate-50 text-slate-400 border-slate-200 hover:text-slate-600 hover:bg-slate-100'
+                              }`}
+                            >
+                              DB
+                            </span>
+                          </label>
+                        )}
                         {row.productId && onLinkChildToHero && (
                           <button
                             type="button"
@@ -645,24 +658,28 @@ export const EstimatorView: React.FC<EstimatorViewProps> = ({
                 ))
               )}
             </tbody>
-            {/* Totals Table Footer */}
+            {/* Totals Table Footer - Perfectly Aligned Columns */}
             {estimateRows.length > 0 && (
               <tfoot>
                 <tr className="bg-slate-100 font-bold text-slate-900 border-t-2 border-slate-300">
-                  <td colSpan={3} className="py-3 px-4 text-left font-black tracking-wider uppercase">
+                  <td colSpan={2} className="py-3.5 px-3 text-left font-black tracking-wider uppercase text-slate-700">
                     Totals c/o
                   </td>
-                  <td colSpan={2} className="py-3 px-3 text-left font-black text-blue-700">
-                    {summary.totalUnits.toFixed(2)} Units
+                  <td className="py-3.5 px-3 text-right font-mono font-black text-blue-700">
+                    {summary.totalUnits.toFixed(2)}
                   </td>
+                  <td className="py-3.5 px-2 text-center text-slate-500 font-bold text-[11px]">
+                    Units
+                  </td>
+                  {enableListPriceMode && <td colSpan={2}></td>}
                   <td
-                    colSpan={enableListPriceMode ? 6 : 4}
-                    className="py-3 px-3 text-right text-slate-500 font-semibold"
+                    colSpan={3}
+                    className="py-3.5 px-3 text-right text-slate-500 font-bold uppercase text-[11px] tracking-wider"
                   >
-                    Total Estimate:
+                    Gross Subtotal:
                   </td>
-                  <td className="py-3 px-3 text-right text-emerald-700 text-sm font-black">
-                    {formatINR(summary.totalAmount)}
+                  <td className="py-3.5 px-3 text-right font-mono text-slate-900 text-sm font-black">
+                    {formatINR(summary.grossTotal || summary.totalAmount)}
                   </td>
                   <td></td>
                 </tr>
@@ -706,32 +723,60 @@ export const EstimatorView: React.FC<EstimatorViewProps> = ({
         )}
 
         {/* Section C: Summary & Action Buttons */}
-        <div className="flex flex-col lg:flex-row items-center justify-between gap-6 pt-2">
-          <div className="flex flex-wrap items-center gap-4 text-xs text-slate-500">
-            <span className="font-semibold text-slate-700">
-              Total Items: <b className="text-slate-900">{summary.itemCount}</b>
-            </span>
-            <span>•</span>
-            <span className="font-semibold text-slate-700">
-              Total Units: <b className="text-blue-700">{summary.totalUnits.toFixed(2)} Units</b>
-            </span>
-            {summary.totalSavings > 0 && (
-              <>
-                <span>•</span>
-                <span className="font-semibold text-emerald-600">
-                  Discount Savings: {formatINR(summary.totalSavings)}
+        <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-6 pt-2">
+          {/* Left: Summary Items, Units & Shopkeeper Eyes Only Profit Badge */}
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="flex items-center gap-2 text-xs text-slate-500">
+              <span className="font-semibold text-slate-700">
+                Total Items: <b className="text-slate-900">{summary.itemCount}</b>
+              </span>
+              <span>•</span>
+              <span className="font-semibold text-slate-700">
+                Total Units: <b className="text-blue-700">{summary.totalUnits.toFixed(2)} Units</b>
+              </span>
+            </div>
+
+            {/* Shopkeeper Eyes Only Profit Badge */}
+            {summary.totalCost > 0 && (
+              <div className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200/80 px-3 py-1.5 shadow-xs">
+                <span className="text-[10px] font-black uppercase tracking-wider text-emerald-800">
+                  Est. Profit:
                 </span>
-              </>
+                <span className="text-xs font-mono font-black text-emerald-700">
+                  {formatINR(summary.totalProfit)}
+                </span>
+                <span className="text-[10px] font-bold text-emerald-600 bg-emerald-100/60 px-1.5 py-0.5 rounded">
+                  {summary.profitMarginPercentage}% Margin
+                </span>
+              </div>
             )}
           </div>
 
-          {/* Big Total Box */}
-          <div className="flex items-center gap-6">
+          {/* Right: Cash Discount, Estimated Budget & Action Buttons */}
+          <div className="flex flex-wrap items-center gap-4">
+            {/* Manual Cash Discount Input in Rupees */}
+            <div className="flex items-center gap-1.5 rounded-xl border border-rose-200 bg-rose-50/50 px-3 py-1.5">
+              <label className="text-[11px] font-black uppercase tracking-wider text-rose-700 whitespace-nowrap">
+                Discount (₹):
+              </label>
+              <input
+                type="number"
+                min="0"
+                step="1"
+                placeholder="0"
+                value={cashDiscount || ''}
+                onChange={(e) => onCashDiscountChange?.(parseFloat(e.target.value) || 0)}
+                className="w-20 rounded-lg border border-rose-200 bg-white px-2 py-1 text-right font-mono text-xs font-black text-rose-700 outline-none focus:border-rose-400"
+                title="Overall discount in Rupees"
+              />
+            </div>
+
+            {/* Big Total Box */}
             <div className="text-right">
-              <span className="text-xs uppercase tracking-wider text-slate-400 font-bold">
+              <span className="text-xs uppercase tracking-wider text-slate-400 font-bold block">
                 Estimated Budget
               </span>
-              <div className="text-2xl font-black text-emerald-600">
+              <div className="text-2xl font-black text-emerald-600 font-mono">
                 {formatINR(summary.totalAmount)}
               </div>
             </div>

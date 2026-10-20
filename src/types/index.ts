@@ -57,6 +57,9 @@ export interface EstimateRow {
   lineTotal: number
   updateListPriceInDb?: boolean
   originalListPrice?: number
+  originalDiscountPercentage?: number
+  originalCostPrice?: number
+  originalMarginPercentage?: number
 }
 
 export interface Quotation {
@@ -72,12 +75,26 @@ export interface Quotation {
   item_count?: number
 }
 
+export interface EstimatorSummary {
+  itemCount: number
+  totalUnits: number
+  grossTotal: number
+  cashDiscount: number
+  totalSavings: number
+  totalAmount: number
+  totalCost: number
+  totalProfit: number
+  profitMarginPercentage: number
+}
+
 export interface PrintQuoteData {
   invoiceNo: string
   partyName: string
   phone: string
   dated: string
   totalUnits: number
+  grossTotal?: number
+  discountAmount?: number
   totalAmount: number
   items: EstimateRow[]
 }

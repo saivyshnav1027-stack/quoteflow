@@ -118,21 +118,68 @@ export const PrintSlipModal: React.FC<PrintSlipModalProps> = ({ isOpen, onClose,
                 ))}
               </tbody>
               <tfoot>
-                <tr className="border-t-2 border-black font-bold bg-slate-50/30">
-                  <td colSpan={2} className="border border-black py-1.5 px-2.5 text-left uppercase">
-                    Total
-                  </td>
-                  <td className="border border-black py-1.5 px-2 text-center font-black">
-                    {data.totalUnits.toFixed(2)} Units
-                  </td>
-                  <td className="border border-black py-1.5 px-2 text-right uppercase text-[10px]">
-                    Net Total:
-                  </td>
-                  <td className="border border-black py-1.5 px-2 text-right font-black text-sm">
-                    {Number(data.totalAmount).toFixed(2)}
-                  </td>
-                  <td className="border border-black py-1.5 px-1 text-center" />
-                </tr>
+                {data.discountAmount && data.discountAmount > 0 ? (
+                  <>
+                    <tr className="border-t-2 border-black font-semibold text-[11px] bg-slate-50/20">
+                      <td colSpan={2} className="border border-black py-1 px-2.5 text-left uppercase font-bold">
+                        Subtotal
+                      </td>
+                      <td className="border border-black py-1 px-2 text-center font-bold">
+                        {data.totalUnits.toFixed(2)} Units
+                      </td>
+                      <td className="border border-black py-1 px-2 text-right uppercase text-[10px] font-bold">
+                        Subtotal:
+                      </td>
+                      <td className="border border-black py-1 px-2 text-right font-bold">
+                        {Number(data.grossTotal || (data.totalAmount + data.discountAmount)).toFixed(2)}
+                      </td>
+                      <td className="border border-black py-1 px-1 text-center" />
+                    </tr>
+                    <tr className="border-b border-black font-semibold text-[11px]">
+                      <td colSpan={3} className="border border-black py-1 px-2.5 text-left">
+                        {/* Empty spacer */}
+                      </td>
+                      <td className="border border-black py-1 px-2 text-right font-bold text-[11px]">
+                        Discount:
+                      </td>
+                      <td className="border border-black py-1 px-2 text-right font-bold text-rose-700">
+                        - {Number(data.discountAmount).toFixed(2)}
+                      </td>
+                      <td className="border border-black py-1 px-1 text-center" />
+                    </tr>
+                    <tr className="border-t-2 border-black font-bold bg-slate-50/40">
+                      <td colSpan={2} className="border border-black py-1.5 px-2.5 text-left uppercase font-black">
+                        Total
+                      </td>
+                      <td className="border border-black py-1.5 px-2 text-center font-black">
+                        {data.totalUnits.toFixed(2)} Units
+                      </td>
+                      <td className="border border-black py-1.5 px-2 text-right uppercase text-[10px] font-black">
+                        Net Total:
+                      </td>
+                      <td className="border border-black py-1.5 px-2 text-right font-black text-sm">
+                        {Number(data.totalAmount).toFixed(2)}
+                      </td>
+                      <td className="border border-black py-1.5 px-1 text-center" />
+                    </tr>
+                  </>
+                ) : (
+                  <tr className="border-t-2 border-black font-bold bg-slate-50/30">
+                    <td colSpan={2} className="border border-black py-1.5 px-2.5 text-left uppercase">
+                      Total
+                    </td>
+                    <td className="border border-black py-1.5 px-2 text-center font-black">
+                      {data.totalUnits.toFixed(2)} Units
+                    </td>
+                    <td className="border border-black py-1.5 px-2 text-right uppercase text-[10px]">
+                      Net Total:
+                    </td>
+                    <td className="border border-black py-1.5 px-2 text-right font-black text-sm">
+                      {Number(data.totalAmount).toFixed(2)}
+                    </td>
+                    <td className="border border-black py-1.5 px-1 text-center" />
+                  </tr>
+                )}
               </tfoot>
             </table>
 

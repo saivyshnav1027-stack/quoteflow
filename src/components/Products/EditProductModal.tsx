@@ -130,9 +130,15 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({
                   type="number"
                   step="0.01"
                   value={formData.cost_price}
-                  onChange={(e) =>
-                    setFormData({ ...formData, cost_price: parseFloat(e.target.value) || 0 })
-                  }
+                  onChange={(e) => {
+                    const cost = parseFloat(e.target.value) || 0
+                    const list = formData.list_price || 0
+                    const dis =
+                      list > 0 && cost > 0
+                        ? Number((((list - cost) / list) * 100).toFixed(2))
+                        : formData.discount_percentage
+                    setFormData({ ...formData, cost_price: cost, discount_percentage: dis })
+                  }}
                   className="w-full rounded-xl border border-slate-200 px-2.5 py-2 text-xs outline-none focus:border-blue-500 font-bold text-slate-700"
                 />
               </div>

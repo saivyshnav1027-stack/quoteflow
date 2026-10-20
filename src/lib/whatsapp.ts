@@ -16,6 +16,11 @@ export function generateWhatsAppMessage(data: PrintQuoteData): string {
 
   msg += `---------------------------------\n`
   msg += `*Totals c/o:* ${data.totalUnits} Units\n`
+  if (data.discountAmount && data.discountAmount > 0) {
+    const gross = data.grossTotal || (data.totalAmount + data.discountAmount)
+    msg += `*Subtotal:* ₹${gross.toLocaleString('en-IN', { minimumFractionDigits: 2 })}\n`
+    msg += `*Discount:* -₹${data.discountAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}\n`
+  }
   msg += `*Total Estimate:* ₹${data.totalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}\n`
   msg += `---------------------------------\n`
   msg += `Thank you for your business!`

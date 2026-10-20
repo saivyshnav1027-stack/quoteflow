@@ -199,7 +199,15 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({
                   step="0.01"
                   placeholder="Auto"
                   value={costPrice}
-                  onChange={(e) => setCostPrice(parseFloat(e.target.value) || '')}
+                  onChange={(e) => {
+                    const cVal = parseFloat(e.target.value) || ''
+                    setCostPrice(cVal)
+                    const costNum = typeof cVal === 'number' ? cVal : 0
+                    const listNum = typeof listPrice === 'number' ? listPrice : 0
+                    if (listNum > 0 && costNum > 0) {
+                      setDiscountPercentage(Number((((listNum - costNum) / listNum) * 100).toFixed(2)))
+                    }
+                  }}
                   className="w-full rounded-xl border border-slate-200 px-2.5 py-2 text-xs outline-none focus:border-blue-500 text-slate-700 font-semibold"
                 />
               </div>

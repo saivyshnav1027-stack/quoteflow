@@ -73,6 +73,7 @@ function App() {
   const [isSavingQuote, setIsSavingQuote] = useState(false)
   const [saveSuccessMsg, setSaveSuccessMsg] = useState('')
   const [whatsappSharedNotice, setWhatsappSharedNotice] = useState(false)
+  const [cashDiscount, setCashDiscount] = useState<number>(0)
 
   // Print Slip Modal State
   const [showPrintModal, setShowPrintModal] = useState(false)
@@ -312,6 +313,9 @@ function App() {
         lineTotal: 0,
         updateListPriceInDb: false,
         originalListPrice: prod.list_price || 0,
+        originalDiscountPercentage: prod.discount_percentage || 0,
+        originalCostPrice: cost,
+        originalMarginPercentage: margin,
       },
       enableListPriceMode
     )
@@ -346,6 +350,9 @@ function App() {
             lineTotal: 0,
             updateListPriceInDb: false,
             originalListPrice: childList,
+            originalDiscountPercentage: childDis,
+            originalCostPrice: childCost,
+            originalMarginPercentage: childMargin,
           },
           enableListPriceMode
         )
@@ -362,7 +369,7 @@ function App() {
       prev.map((r) => {
         if (r.id !== id) return r
         const updated = { ...r, [field]: val }
-        return calcRow(updated, enableListPriceMode)
+        return calcRow(updated, enableListPriceMode, field as any)
       })
     )
   }
@@ -372,8 +379,8 @@ function App() {
   }
 
   const summary = useMemo(() => {
-    return calculateTotals(estimateRows)
-  }, [estimateRows])
+    return calculateTotals(estimateRows, cashDiscount)
+  }, [estimateRows, cashDiscount])
 
   // Save or Update Quotation Execution
   const executeSaveQuotation = async () => {
@@ -419,21 +426,21 @@ function App() {
 
       const data = await res.json()
       if (data.success) {
-        // Handle selective List Price updates to database
+        // Handle selective pricing updates to database
         const rowsToUpdate = estimateRows.filter(
           (r) =>
             r.productId !== null &&
-            r.updateListPriceInDb === true &&
-            Number(r.listPrice || 0) > 0 &&
-            Number(r.listPrice) !== Number(r.originalListPrice)
+            r.updateListPriceInDb === true && (
+              Number(r.listPrice) !== Number(r.originalListPrice) ||
+              Number(r.discountPercentage) !== Number(r.originalDiscountPercentage) ||
+              Number(r.costPrice) !== Number(r.originalCostPrice) ||
+              Number(r.marginPercentage) !== Number(r.originalMarginPercentage)
+            )
         )
 
         if (rowsToUpdate.length > 0) {
           const updateResults = await Promise.allSettled(
             rowsToUpdate.map(async (row) => {
-              const updatedCost = Number(
-                (Number(row.listPrice) * (1 - Number(row.discountPercentage || 0) / 100)).toFixed(2)
-              )
               const prodRes = await fetch(`${API_BASE}/products/${row.productId}`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
@@ -442,22 +449,30 @@ function App() {
                   productCode: row.productCode,
                   productName: row.description,
                   unit: row.unit,
-                  listPrice: Number(row.listPrice),
+                  listPrice: Number(row.listPrice || 0),
                   discountPercentage: Number(row.discountPercentage || 0),
-                  costPrice: updatedCost,
+                  costPrice: Number(row.costPrice || 0),
                   marginPercentage: Number(row.marginPercentage || 15),
                 }),
               })
               if (!prodRes.ok) throw new Error(`Failed to update ${row.description}`)
               return {
                 productId: row.productId as number,
-                listPrice: Number(row.listPrice),
-                costPrice: updatedCost,
+                listPrice: Number(row.listPrice || 0),
+                discountPercentage: Number(row.discountPercentage || 0),
+                costPrice: Number(row.costPrice || 0),
+                marginPercentage: Number(row.marginPercentage || 15),
               }
             })
           )
 
-          const successfulUpdates: { productId: number; listPrice: number; costPrice: number }[] = []
+          const successfulUpdates: {
+            productId: number
+            listPrice: number
+            discountPercentage: number
+            costPrice: number
+            marginPercentage: number
+          }[] = []
           const failedUpdates: string[] = []
 
           updateResults.forEach((res, idx) => {
@@ -473,19 +488,25 @@ function App() {
               prev.map((p) => {
                 const match = successfulUpdates.find((u) => u.productId === p.id)
                 if (match) {
-                  return { ...p, list_price: match.listPrice, cost_price: match.costPrice }
+                  return {
+                    ...p,
+                    list_price: match.listPrice,
+                    discount_percentage: match.discountPercentage,
+                    cost_price: match.costPrice,
+                    margin_percentage: match.marginPercentage,
+                  }
                 }
                 return p
               })
             )
             addToast(
               'success',
-              `Saved updated List Price to database for ${successfulUpdates.length} product(s).`
+              `Saved updated pricing to database for ${successfulUpdates.length} product(s).`
             )
           }
 
           if (failedUpdates.length > 0) {
-            addToast('error', `Failed to update database List Price for: ${failedUpdates.join(', ')}`)
+            addToast('error', `Failed to update database pricing for: ${failedUpdates.join(', ')}`)
           }
         }
 
@@ -504,6 +525,8 @@ function App() {
           phone: selectedCustomer.phone,
           dated: `${new Date().toLocaleDateString('en-GB')} (${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })})`,
           totalUnits: summary.totalUnits,
+          grossTotal: summary.grossTotal,
+          discountAmount: summary.cashDiscount,
           totalAmount: summary.totalAmount,
           items: estimateRows,
         })
@@ -529,6 +552,7 @@ function App() {
           setEditingQuotationId(null)
           setEditingEstimateNo('')
           setEstimateRows([])
+          setCashDiscount(0)
           const todayPrefix = getTodayDatePrefix()
           const stored = localStorage.getItem('sri_current_estimate_no')
           if (stored && stored.startsWith(todayPrefix)) {
@@ -553,31 +577,34 @@ function App() {
     }
   }
 
-  // Explicit Confirmation Guard for List Price Database Updates
+  // Explicit Confirmation Guard for Pricing Database Updates
   const handleSaveEstimateRequest = () => {
     if (estimateRows.length === 0) {
       addToast('info', 'Please add at least one product to the estimate before saving.')
       return
     }
 
-    // Check if any rows qualify for updating List Price in the database
+    // Check if any rows qualify for updating pricing in the database
     const rowsToUpdate = estimateRows.filter(
       (r) =>
         r.productId !== null &&
-        r.updateListPriceInDb === true &&
-        Number(r.listPrice || 0) > 0 &&
-        Number(r.listPrice) !== Number(r.originalListPrice)
+        r.updateListPriceInDb === true && (
+          Number(r.listPrice) !== Number(r.originalListPrice) ||
+          Number(r.discountPercentage) !== Number(r.originalDiscountPercentage) ||
+          Number(r.costPrice) !== Number(r.originalCostPrice) ||
+          Number(r.marginPercentage) !== Number(r.originalMarginPercentage)
+        )
     )
 
     if (rowsToUpdate.length > 0) {
       const isSingle = rowsToUpdate.length === 1
       const itemDescription = isSingle
-        ? `1 item (e.g. ${rowsToUpdate[0].description}: ₹${Number(rowsToUpdate[0].originalListPrice ?? rowsToUpdate[0].listPrice).toFixed(2)} → ₹${Number(rowsToUpdate[0].listPrice).toFixed(2)})`
+        ? `1 item (${rowsToUpdate[0].description}: List ₹${rowsToUpdate[0].listPrice}, Dis ${rowsToUpdate[0].discountPercentage}%, Cost ₹${rowsToUpdate[0].costPrice}, Margin ${rowsToUpdate[0].marginPercentage}%)`
         : `${rowsToUpdate.length} items:\n` +
           rowsToUpdate
             .map(
               (r) =>
-                `• ${r.description}: ₹${Number(r.originalListPrice ?? r.listPrice).toFixed(2)} → ₹${Number(r.listPrice).toFixed(2)}`
+                `• ${r.description}: List ₹${r.listPrice}, Dis ${r.discountPercentage}%, Cost ₹${r.costPrice}, Margin ${r.marginPercentage}%`
             )
             .join('\n')
 
@@ -614,6 +641,8 @@ function App() {
       phone: selectedCustomer.phone || '',
       dated: new Date().toLocaleDateString('en-GB'),
       totalUnits: summary.totalUnits,
+      grossTotal: summary.grossTotal,
+      discountAmount: summary.cashDiscount,
       totalAmount: summary.totalAmount,
       items: estimateRows,
     })
@@ -661,6 +690,7 @@ function App() {
     setEditingQuotationId(null)
     setEditingEstimateNo('')
     setEstimateRows([])
+    setCashDiscount(0)
     setWhatsappSharedNotice(false)
     const nextNo = incrementEstimateNumber(currentEstimateNo)
     setCurrentEstimateNo(nextNo)
@@ -671,6 +701,7 @@ function App() {
     setEditingQuotationId(null)
     setEditingEstimateNo('')
     setEstimateRows([])
+    setCashDiscount(0)
     setWhatsappSharedNotice(false)
     const todayPrefix = getTodayDatePrefix()
     const stored = localStorage.getItem('sri_current_estimate_no')
@@ -693,6 +724,8 @@ function App() {
       phone: selectedCustomer.phone,
       dated: `${new Date().toLocaleDateString('en-GB')} (${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })})`,
       totalUnits: summary.totalUnits,
+      grossTotal: summary.grossTotal,
+      discountAmount: summary.cashDiscount,
       totalAmount: summary.totalAmount,
       items: estimateRows,
     })
@@ -1081,6 +1114,8 @@ function App() {
               onUpdateRow={updateRow}
               onRemoveRow={removeRow}
               summary={summary}
+              cashDiscount={cashDiscount}
+              onCashDiscountChange={setCashDiscount}
               enableListPriceMode={enableListPriceMode}
               whatsappSharedNotice={whatsappSharedNotice}
               onDismissWhatsAppNotice={() => setWhatsappSharedNotice(false)}
