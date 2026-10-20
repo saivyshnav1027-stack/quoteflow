@@ -4,7 +4,7 @@ import { AlertTriangle, AlertCircle, Trash2, X, Loader2 } from 'lucide-react'
 export interface ConfirmModalProps {
   isOpen: boolean
   title: string
-  message: string
+  message: string | React.ReactNode
   confirmText?: string
   cancelText?: string
   variant?: 'danger' | 'warning' | 'primary'
@@ -61,7 +61,7 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
           </div>
           <div className="flex-1">
             <h3 className="text-base font-bold text-slate-900">{title}</h3>
-            <p className="mt-1.5 text-xs text-slate-500 leading-relaxed">{message}</p>
+            <div className="mt-1.5 text-xs text-slate-500 leading-relaxed whitespace-pre-line">{message}</div>
           </div>
           <button
             type="button"

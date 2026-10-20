@@ -14,6 +14,31 @@ export function shouldUpdateProductListPriceInDb(row: EstimateRow): boolean {
 }
 
 /**
+ * Pure helper detecting whether saving an estimate requires the explicit confirmation modal
+ */
+export function getPendingDbPriceUpdates(rows: EstimateRow[]): EstimateRow[] {
+  return rows.filter(shouldUpdateProductListPriceInDb)
+}
+
+/**
+ * Pure helper formatting the explicit permanent price change confirmation warning
+ */
+export function formatPriceChangeWarningMessage(rowsToUpdate: EstimateRow[]): string {
+  const isSingle = rowsToUpdate.length === 1
+  const itemDescription = isSingle
+    ? `1 item (e.g. ${rowsToUpdate[0].description}: ₹${Number(rowsToUpdate[0].originalListPrice ?? rowsToUpdate[0].listPrice).toFixed(2)} → ₹${Number(rowsToUpdate[0].listPrice).toFixed(2)})`
+    : `${rowsToUpdate.length} items:\n\n` +
+      rowsToUpdate
+        .map(
+          (r) =>
+            `• ${r.description}: ₹${Number(r.originalListPrice ?? r.listPrice).toFixed(2)} → ₹${Number(r.listPrice).toFixed(2)}`
+        )
+        .join('\n')
+
+  return `⚠️ Permanent Price Change: You are about to update the master catalog price for ${itemDescription}. This will affect all future quotes. Do you want to proceed?`
+}
+
+/**
  * Pure helper checking for circular dependency when linking child to hero product
  */
 export function checkCircularReference(
@@ -383,6 +408,97 @@ describe('Review & Validation: Edge Cases & State Isolation', () => {
     // Historical record remains completely unchanged
     expect(historicalItem.list_price).toBe(350)
     expect(historicalItem.line_total).toBe(3800)
+  })
+
+  it('triggers explicit confirmation modal only when pending DB price updates exist', () => {
+    const rowsWithoutDbUpdate: EstimateRow[] = [
+      {
+        id: 'r1',
+        productId: 101,
+        productCode: 'SKU-1',
+        description: 'CPVC Pipe',
+        checked: false,
+        quantity: 1,
+        unit: 'Pcs.',
+        listPrice: 450,
+        originalListPrice: 400,
+        discountPercentage: 0,
+        costPrice: 450,
+        marginPercentage: 15,
+        discount: 0,
+        discountType: 'PERCENT',
+        price: 517.5,
+        lineTotal: 517.5,
+        updateListPriceInDb: false, // Not checked
+      },
+    ]
+
+    expect(getPendingDbPriceUpdates(rowsWithoutDbUpdate)).toHaveLength(0)
+
+    const rowsWithDbUpdate: EstimateRow[] = [
+      {
+        ...rowsWithoutDbUpdate[0],
+        updateListPriceInDb: true, // Checked
+      },
+    ]
+
+    const pending = getPendingDbPriceUpdates(rowsWithDbUpdate)
+    expect(pending).toHaveLength(1)
+
+    const warning = formatPriceChangeWarningMessage(pending)
+    expect(warning).toContain('Permanent Price Change')
+    expect(warning).toContain('1 item (e.g. CPVC Pipe: ₹400.00 → ₹450.00)')
+    expect(warning).toContain('This will affect all future quotes. Do you want to proceed?')
+  })
+
+  it('formats warning message accurately for multiple items', () => {
+    const multiplePending: EstimateRow[] = [
+      {
+        id: 'r1',
+        productId: 101,
+        productCode: 'SKU-1',
+        description: 'CPVC Pipe 1"',
+        checked: false,
+        quantity: 1,
+        unit: 'Pcs.',
+        listPrice: 450,
+        originalListPrice: 400,
+        discountPercentage: 0,
+        costPrice: 450,
+        marginPercentage: 15,
+        discount: 0,
+        discountType: 'PERCENT',
+        price: 517.5,
+        lineTotal: 517.5,
+        updateListPriceInDb: true,
+      },
+      {
+        id: 'r2',
+        productId: 102,
+        productCode: 'SKU-2',
+        description: 'Brass Valve 1"',
+        checked: false,
+        quantity: 2,
+        unit: 'Pcs.',
+        listPrice: 650,
+        originalListPrice: 600,
+        discountPercentage: 0,
+        costPrice: 650,
+        marginPercentage: 15,
+        discount: 0,
+        discountType: 'PERCENT',
+        price: 747.5,
+        lineTotal: 1495,
+        updateListPriceInDb: true,
+      },
+    ]
+
+    const warning = formatPriceChangeWarningMessage(multiplePending)
+    expect(warning).toContain('Permanent Price Change')
+    expect(warning).toContain('2 items:')
+    expect(warning).toContain('• CPVC Pipe 1": ₹400.00 → ₹450.00')
+    expect(warning).toContain('• Brass Valve 1": ₹600.00 → ₹650.00')
+    expect(warning).toContain('This will affect all future quotes. Do you want to proceed?')
   })
 })
 

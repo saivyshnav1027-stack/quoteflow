@@ -554,8 +554,14 @@ export const EstimatorView: React.FC<EstimatorViewProps> = ({
                           />
                           {row.productId && (
                             <label
-                              className="flex items-center justify-end gap-1 mt-1 text-[10px] text-slate-500 font-semibold cursor-pointer select-none hover:text-blue-600"
-                              title="Update List Price in Database when saving estimate"
+                              className={`flex items-center justify-end gap-1 mt-1 text-[10px] font-semibold cursor-pointer select-none transition-colors ${
+                                row.updateListPriceInDb ? 'text-amber-600 font-bold' : 'text-slate-500 hover:text-blue-600'
+                              }`}
+                              title={
+                                row.updateListPriceInDb
+                                  ? 'Marked to permanently update List Price in Database upon save'
+                                  : 'Update List Price in Database when saving estimate'
+                              }
                             >
                               <input
                                 type="checkbox"
@@ -563,9 +569,9 @@ export const EstimatorView: React.FC<EstimatorViewProps> = ({
                                 onChange={(e) =>
                                   onUpdateRow(row.id, 'updateListPriceInDb', e.target.checked)
                                 }
-                                className="h-3 w-3 rounded text-blue-600 focus:ring-blue-400 cursor-pointer"
+                                className="h-3 w-3 rounded text-amber-600 focus:ring-amber-400 cursor-pointer"
                               />
-                              <span>Save to DB</span>
+                              <span>{row.updateListPriceInDb ? '⚠️ Save to DB' : 'Save to DB'}</span>
                             </label>
                           )}
                         </td>

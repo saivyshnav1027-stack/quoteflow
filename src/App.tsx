@@ -99,7 +99,7 @@ function App() {
   const [confirmModal, setConfirmModal] = useState<{
     isOpen: boolean
     title: string
-    message: string
+    message: string | React.ReactNode
     confirmText?: string
     cancelText?: string
     variant?: 'danger' | 'warning' | 'primary'
@@ -375,8 +375,8 @@ function App() {
     return calculateTotals(estimateRows)
   }, [estimateRows])
 
-  // Save or Update Quotation
-  const saveQuotationToBackend = async () => {
+  // Save or Update Quotation Execution
+  const executeSaveQuotation = async () => {
     if (estimateRows.length === 0) {
       addToast('info', 'Please add at least one product to the estimate before saving.')
       return
@@ -553,6 +553,54 @@ function App() {
     }
   }
 
+  // Explicit Confirmation Guard for List Price Database Updates
+  const handleSaveEstimateRequest = () => {
+    if (estimateRows.length === 0) {
+      addToast('info', 'Please add at least one product to the estimate before saving.')
+      return
+    }
+
+    // Check if any rows qualify for updating List Price in the database
+    const rowsToUpdate = estimateRows.filter(
+      (r) =>
+        r.productId !== null &&
+        r.updateListPriceInDb === true &&
+        Number(r.listPrice || 0) > 0 &&
+        Number(r.listPrice) !== Number(r.originalListPrice)
+    )
+
+    if (rowsToUpdate.length > 0) {
+      const isSingle = rowsToUpdate.length === 1
+      const itemDescription = isSingle
+        ? `1 item (e.g. ${rowsToUpdate[0].description}: ₹${Number(rowsToUpdate[0].originalListPrice ?? rowsToUpdate[0].listPrice).toFixed(2)} → ₹${Number(rowsToUpdate[0].listPrice).toFixed(2)})`
+        : `${rowsToUpdate.length} items:\n` +
+          rowsToUpdate
+            .map(
+              (r) =>
+                `• ${r.description}: ₹${Number(r.originalListPrice ?? r.listPrice).toFixed(2)} → ₹${Number(r.listPrice).toFixed(2)}`
+            )
+            .join('\n')
+
+      setConfirmModal({
+        isOpen: true,
+        title: '⚠️ Permanent Price Change',
+        message: isSingle
+          ? `You are about to update the master catalog price for ${itemDescription}. This will affect all future quotes. Do you want to proceed?`
+          : `You are about to update the master catalog price for ${rowsToUpdate.length} items:\n\n${itemDescription}\n\nThis will affect all future quotes. Do you want to proceed?`,
+        confirmText: 'Proceed & Update DB',
+        cancelText: 'Cancel',
+        variant: 'warning',
+        onConfirm: async () => {
+          setConfirmModal(null)
+          await executeSaveQuotation()
+        },
+      })
+      return
+    }
+
+    executeSaveQuotation()
+  }
+
   // WhatsApp Share
   const shareViaWhatsApp = () => {
     if (estimateRows.length === 0) {
@@ -573,7 +621,7 @@ function App() {
     setWhatsappSharedNotice(true)
     addToast('success', 'WhatsApp share link opened.')
     // Auto-save estimate to database when shared
-    saveQuotationToBackend()
+    executeSaveQuotation()
   }
 
   // Clear Estimate
@@ -1040,7 +1088,7 @@ function App() {
               onClearEstimate={clearCurrentEstimate}
               onOpenPrintSlip={openPrintSlip}
               onShareWhatsApp={shareViaWhatsApp}
-              onSaveEstimate={saveQuotationToBackend}
+              onSaveEstimate={handleSaveEstimateRequest}
               isSavingQuote={isSavingQuote}
               isEditing={editingQuotationId !== null}
               editingEstimateNo={editingEstimateNo}
