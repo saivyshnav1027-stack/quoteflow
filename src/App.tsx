@@ -21,6 +21,8 @@ import { ConfirmModal } from './components/Common/ConfirmModal'
 import { EstimateSavedModal } from './components/Common/EstimateSavedModal'
 import { ToastContainer, type ToastMessage } from './components/Common/Toast'
 import { AppSplashScreen } from './components/Common/AppSplashScreen'
+import { ErrorModal } from './components/Common/ErrorModal'
+import { CatalogSyncSuccessModal, type CatalogUpdateSummaryItem } from './components/Common/CatalogSyncSuccessModal'
 
 import { INITIAL_PRODUCTS, INITIAL_CUSTOMERS } from './lib/constants'
 
@@ -123,6 +125,23 @@ function App() {
     totalUnits: number
     isUpdated: boolean
   } | null>(null)
+
+  // Critical Error Recovery Modal State
+  const [errorModalState, setErrorModalState] = useState<{
+    isOpen: boolean
+    title: string
+    message: string
+    errorCode?: string
+    rawError?: string
+    canEmergencyPrint?: boolean
+    canRetry?: boolean
+    backupData?: any
+    onEmergencyPrint?: () => void
+    onRetry?: () => Promise<void> | void
+  } | null>(null)
+
+  // Master Catalog Price Sync Success Modal State
+  const [catalogSyncSummary, setCatalogSyncSummary] = useState<CatalogUpdateSummaryItem[] | null>(null)
 
   // Loaders
   const checkDb = async () => {
@@ -519,6 +538,18 @@ function App() {
                 return p
               })
             )
+            const summaryItems: CatalogUpdateSummaryItem[] = successfulUpdates.map((u) => {
+              const row = rowsToUpdate.find((r) => r.productId === u.productId)
+              return {
+                productId: u.productId,
+                productName: row?.description || 'Catalog Product',
+                listPrice: u.listPrice,
+                discountPercentage: u.discountPercentage,
+                costPrice: u.costPrice,
+                marginPercentage: u.marginPercentage,
+              }
+            })
+            setCatalogSyncSummary(summaryItems)
             addToast(
               'success',
               `Saved updated pricing to database for ${successfulUpdates.length} product(s).`
@@ -587,11 +618,51 @@ function App() {
           localStorage.setItem('sri_current_estimate_no', nextNo)
         }
       } else {
-        addToast('error', data.message || data.error || 'Failed to save quotation.')
+        const errorMsg = data.message || data.error || 'Failed to save quotation.'
+        addToast('error', errorMsg)
+        setErrorModalState({
+          isOpen: true,
+          title: 'Failed to Save Estimate',
+          message: `The cloud database returned an error while saving Estimate #${isUpdating ? editingEstimateNo : currentEstimateNo}.`,
+          errorCode: 'ERR_CLOUD_SAVE_FAILED',
+          rawError: errorMsg,
+          canEmergencyPrint: true,
+          canRetry: true,
+          backupData: payload,
+          onEmergencyPrint: () => {
+            openPrintSlip()
+          },
+          onRetry: async () => {
+            setErrorModalState(null)
+            await executeSaveQuotation()
+          },
+        })
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error(err)
+      const errorMsg = err?.message || 'Network disconnected or cloud unreachable.'
       addToast('error', 'Network error while saving quotation.')
+      setErrorModalState({
+        isOpen: true,
+        title: 'Network / Cloud Offline',
+        message: 'Could not connect to the cloud database server. You can still print an emergency estimate slip for the customer right now so business is not interrupted.',
+        errorCode: 'ERR_NETWORK_DISCONNECTED',
+        rawError: errorMsg,
+        canEmergencyPrint: true,
+        canRetry: true,
+        backupData: {
+          estimateNo: editingQuotationId !== null ? editingEstimateNo : currentEstimateNo,
+          customer: selectedCustomer,
+          rows: estimateRows,
+        },
+        onEmergencyPrint: () => {
+          openPrintSlip()
+        },
+        onRetry: async () => {
+          setErrorModalState(null)
+          await executeSaveQuotation()
+        },
+      })
     } finally {
       setIsSavingQuote(false)
     }
@@ -1277,6 +1348,32 @@ function App() {
             clearCurrentEstimateDirect()
           }}
           onClose={() => setSavedModalData(null)}
+        />
+      )}
+
+      {/* Critical Error Recovery Modal */}
+      {errorModalState && (
+        <ErrorModal
+          isOpen={errorModalState.isOpen}
+          title={errorModalState.title}
+          message={errorModalState.message}
+          errorCode={errorModalState.errorCode}
+          rawError={errorModalState.rawError}
+          canEmergencyPrint={errorModalState.canEmergencyPrint}
+          canRetry={errorModalState.canRetry}
+          backupData={errorModalState.backupData}
+          onEmergencyPrint={errorModalState.onEmergencyPrint}
+          onRetry={errorModalState.onRetry}
+          onClose={() => setErrorModalState(null)}
+        />
+      )}
+
+      {/* Master Catalog Price Sync Success Modal */}
+      {catalogSyncSummary && (
+        <CatalogSyncSuccessModal
+          isOpen={catalogSyncSummary !== null}
+          items={catalogSyncSummary}
+          onClose={() => setCatalogSyncSummary(null)}
         />
       )}
 
