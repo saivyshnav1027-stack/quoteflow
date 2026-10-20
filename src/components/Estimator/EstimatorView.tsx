@@ -36,9 +36,6 @@ export interface EstimatorViewProps {
   onRemoveRow: (id: string) => void
   summary: EstimatorSummary
   enableListPriceMode: boolean
-  enableFlatRupeeDiscount: boolean
-  enablePriceAfterMargin?: boolean
-  onTogglePriceAfterMargin?: (enabled: boolean) => void
   whatsappSharedNotice: boolean
   onDismissWhatsAppNotice: () => void
   onClearEstimateDirect: () => void
@@ -67,9 +64,6 @@ export const EstimatorView: React.FC<EstimatorViewProps> = ({
   onRemoveRow,
   summary,
   enableListPriceMode,
-  enableFlatRupeeDiscount,
-  enablePriceAfterMargin = false,
-  onTogglePriceAfterMargin,
   whatsappSharedNotice,
   onDismissWhatsAppNotice,
   onClearEstimateDirect,
@@ -144,27 +138,6 @@ export const EstimatorView: React.FC<EstimatorViewProps> = ({
           </p>
         </div>
         <div className="flex items-center gap-2">
-          {onTogglePriceAfterMargin && (
-            <button
-              type="button"
-              onClick={() => onTogglePriceAfterMargin(!enablePriceAfterMargin)}
-              className={`flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-bold transition-all cursor-pointer shadow-sm ${
-                enablePriceAfterMargin
-                  ? 'bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100'
-                  : 'bg-white border-slate-200 text-slate-500 hover:bg-slate-50'
-              }`}
-              title="Toggle Price + Margin markup breakdown column in real-time"
-            >
-              <span>Price+Margin:</span>
-              <span
-                className={`rounded-full px-1.5 py-0.5 text-[10px] font-black uppercase ${
-                  enablePriceAfterMargin ? 'bg-blue-600 text-white' : 'bg-slate-200 text-slate-600'
-                }`}
-              >
-                {enablePriceAfterMargin ? 'ON' : 'OFF'}
-              </span>
-            </button>
-          )}
           <span className="rounded-xl bg-white border border-slate-200 px-3.5 py-1.5 text-xs font-bold text-slate-800 shadow-sm flex items-center gap-1.5">
             <Receipt className="h-3.5 w-3.5 text-blue-600" />
             <span>Est No: #{currentEstimateNo}</span>
@@ -491,10 +464,6 @@ export const EstimatorView: React.FC<EstimatorViewProps> = ({
                 )}
                 <th className="py-3 px-3 text-right w-28">Cost Price (₹)</th>
                 <th className="py-3 px-3 text-right w-20">Margin%</th>
-                {enablePriceAfterMargin && (
-                  <th className="py-3 px-3 text-right w-24">Price + Margin</th>
-                )}
-                <th className="py-3 px-3 text-right w-32">Cust. Dis</th>
                 <th className="py-3 px-3 text-right w-28">Net Price</th>
                 <th className="py-3 px-3 text-right w-32">Amount (₹)</th>
                 <th className="py-3 px-2 text-center w-12">Action</th>
@@ -504,7 +473,7 @@ export const EstimatorView: React.FC<EstimatorViewProps> = ({
               {estimateRows.length === 0 ? (
                 <tr>
                   <td
-                    colSpan={(enableListPriceMode ? 13 : 11) + (enablePriceAfterMargin ? 1 : 0)}
+                    colSpan={enableListPriceMode ? 12 : 10}
                     className="py-12 text-center text-slate-400 text-sm"
                   >
                     No items added to estimate yet. Use the product search bar above to add items.
@@ -614,58 +583,6 @@ export const EstimatorView: React.FC<EstimatorViewProps> = ({
                       />
                     </td>
 
-                    {/* Price After Margin */}
-                    {enablePriceAfterMargin && (
-                      <td className="py-2.5 px-3 text-right font-semibold text-slate-500">
-                        {formatINR(
-                          Number((row.costPrice * (1 + (row.marginPercentage || 0) / 100)).toFixed(2))
-                        )}
-                      </td>
-                    )}
-
-                    {/* Customer Discount */}
-                    <td className="py-2.5 px-3 text-right">
-                      <div className="flex items-center justify-end gap-1">
-                        <input
-                          type="number"
-                          step="0.01"
-                          min="0"
-                          value={row.discount || ''}
-                          placeholder="0"
-                          onChange={(e) =>
-                            onUpdateRow(row.id, 'discount', parseFloat(e.target.value) || 0)
-                          }
-                          className="w-16 rounded border border-slate-200 bg-white px-2 py-1 text-right font-semibold text-emerald-700 outline-none focus:border-blue-500"
-                        />
-                        {enableFlatRupeeDiscount ? (
-                          <button
-                            type="button"
-                            onClick={() =>
-                              onUpdateRow(
-                                row.id,
-                                'discountType',
-                                row.discountType === 'RUPEE' ? 'PERCENT' : 'RUPEE'
-                              )
-                            }
-                            className={`px-1.5 py-0.5 text-[10px] font-extrabold rounded border cursor-pointer ${
-                              row.discountType === 'RUPEE'
-                                ? 'bg-amber-100 text-amber-800 border-amber-300'
-                                : 'bg-emerald-100 text-emerald-800 border-emerald-300'
-                            }`}
-                            title={
-                              row.discountType === 'RUPEE'
-                                ? 'Flat ₹ Cash Discount (Click to switch to %)'
-                                : '% Percentage Discount (Click to switch to ₹)'
-                            }
-                          >
-                            {row.discountType === 'RUPEE' ? '₹' : '%'}
-                          </button>
-                        ) : (
-                          <span className="text-xs font-bold text-slate-400">%</span>
-                        )}
-                      </div>
-                    </td>
-
                     {/* Net Price */}
                     <td className="py-2.5 px-3 text-right font-bold text-blue-700">
                       {formatINR(row.price)}
@@ -700,7 +617,7 @@ export const EstimatorView: React.FC<EstimatorViewProps> = ({
                     {summary.totalUnits.toFixed(2)} Units
                   </td>
                   <td
-                    colSpan={(enableListPriceMode ? 6 : 4) + (enablePriceAfterMargin ? 1 : 0)}
+                    colSpan={enableListPriceMode ? 6 : 4}
                     className="py-3 px-3 text-right text-slate-500 font-semibold"
                   >
                     Total Estimate:

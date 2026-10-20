@@ -47,27 +47,10 @@ function App() {
   const [enableListPriceMode, setEnableListPriceMode] = useState<boolean>(() => {
     return localStorage.getItem('quoteflow_flag_list_price') === 'true'
   })
-  const [enableFlatRupeeDiscount, setEnableFlatRupeeDiscount] = useState<boolean>(() => {
-    const stored = localStorage.getItem('quoteflow_flag_rupee_discount')
-    return stored !== null ? stored === 'true' : true
-  })
-  const [enablePriceAfterMargin, setEnablePriceAfterMargin] = useState<boolean>(() => {
-    return localStorage.getItem('quoteflow_flag_price_after_margin') === 'true'
-  })
 
   const toggleListPriceMode = (val: boolean) => {
     setEnableListPriceMode(val)
     localStorage.setItem('quoteflow_flag_list_price', String(val))
-  }
-
-  const toggleFlatRupeeDiscount = (val: boolean) => {
-    setEnableFlatRupeeDiscount(val)
-    localStorage.setItem('quoteflow_flag_rupee_discount', String(val))
-  }
-
-  const togglePriceAfterMargin = (val: boolean) => {
-    setEnablePriceAfterMargin(val)
-    localStorage.setItem('quoteflow_flag_price_after_margin', String(val))
   }
 
   // Global Data
@@ -835,9 +818,6 @@ function App() {
               onRemoveRow={removeRow}
               summary={summary}
               enableListPriceMode={enableListPriceMode}
-              enableFlatRupeeDiscount={enableFlatRupeeDiscount}
-              enablePriceAfterMargin={enablePriceAfterMargin}
-              onTogglePriceAfterMargin={togglePriceAfterMargin}
               whatsappSharedNotice={whatsappSharedNotice}
               onDismissWhatsAppNotice={() => setWhatsappSharedNotice(false)}
               onClearEstimateDirect={clearCurrentEstimateDirect}
@@ -881,11 +861,7 @@ function App() {
           {activePage === 'Settings' && (
             <AdminSettingsView
               enableListPriceMode={enableListPriceMode}
-              enableFlatRupeeDiscount={enableFlatRupeeDiscount}
-              enablePriceAfterMargin={enablePriceAfterMargin}
               onToggleListPriceMode={toggleListPriceMode}
-              onToggleFlatRupeeDiscount={toggleFlatRupeeDiscount}
-              onTogglePriceAfterMargin={togglePriceAfterMargin}
             />
           )}
         </main>

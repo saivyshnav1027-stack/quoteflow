@@ -1,5 +1,5 @@
-import React, { useState, useRef, useEffect } from 'react'
-import { Plus, Trash2, Calendar, ChevronDown, Clock, AlertTriangle, Pencil } from 'lucide-react'
+import React, { useState, useRef, useEffect, useMemo } from 'react'
+import { Plus, Trash2, Calendar, ChevronDown, Clock, AlertTriangle, Pencil, Search, X } from 'lucide-react'
 import type { Quotation } from '../../types'
 import { formatINR } from '../../lib/pricing'
 
@@ -21,7 +21,20 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   onPurgeQuotations,
 }) => {
   const [showPurgeMenu, setShowPurgeMenu] = useState(false)
+  const [searchQuery, setSearchQuery] = useState('')
   const purgeMenuRef = useRef<HTMLDivElement>(null)
+
+  // Filter quotations by customer name, phone, or quotation number
+  const filteredQuotations = useMemo(() => {
+    if (!searchQuery.trim()) return quotations
+    const q = searchQuery.toLowerCase().trim()
+    return quotations.filter((item) => {
+      const matchNo = (item.quotation_number || '').toLowerCase().includes(q)
+      const matchCustomer = (item.customer_name || '').toLowerCase().includes(q)
+      const matchPhone = (item.phone || '').toLowerCase().includes(q)
+      return matchNo || matchCustomer || matchPhone
+    })
+  }, [quotations, searchQuery])
 
   // Click outside to dismiss purge menu
   useEffect(() => {
@@ -62,27 +75,54 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         </div>
       </div>
 
-      {/* Quotations History Table */}
+      {/* Quotations History Table Card */}
       <div className="rounded-2xl bg-white p-5 shadow-sm border border-slate-200/80">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 mb-4">
           <div>
             <h3 className="text-base font-bold text-slate-900">Recent Estimate History</h3>
-            <span className="text-xs text-slate-500 font-semibold">{quotations.length} records in database</span>
+            <span className="text-xs text-slate-500 font-semibold">
+              {searchQuery.trim()
+                ? `Showing ${filteredQuotations.length} of ${quotations.length} estimates`
+                : `${quotations.length} records in database`}
+            </span>
           </div>
 
-          {/* Purge / Timeline Delete Dropdown */}
-          <div ref={purgeMenuRef} className="relative">
-            <button
-              type="button"
-              onClick={() => setShowPurgeMenu(!showPurgeMenu)}
-              disabled={quotations.length === 0}
-              className="flex items-center gap-2 rounded-xl border border-rose-200 bg-rose-50/60 px-3 py-2 text-xs font-bold text-rose-700 hover:bg-rose-100 transition-colors shadow-sm disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
-              title="Delete estimates based on weekly or monthly timeline"
-            >
-              <Trash2 className="h-3.5 w-3.5 text-rose-600" />
-              <span>Clean Up / Delete</span>
-              <ChevronDown className="h-3.5 w-3.5 text-rose-500" />
-            </button>
+          <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+            {/* Real-Time Search Bar */}
+            <div className="relative min-w-[280px] sm:min-w-[340px]">
+              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+              <input
+                type="text"
+                placeholder="Search by Customer, Phone, or Est #..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full rounded-xl border border-slate-200 bg-slate-50 pl-10 pr-9 py-2 text-xs text-slate-900 placeholder-slate-400 outline-none focus:border-blue-500 focus:bg-white focus:ring-2 focus:ring-blue-100 transition-all font-medium"
+              />
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={() => setSearchQuery('')}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 rounded-md p-1 text-slate-400 hover:bg-slate-200 hover:text-slate-600 transition-colors cursor-pointer"
+                  title="Clear search"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              )}
+            </div>
+
+            {/* Purge / Timeline Delete Dropdown */}
+            <div ref={purgeMenuRef} className="relative shrink-0">
+              <button
+                type="button"
+                onClick={() => setShowPurgeMenu(!showPurgeMenu)}
+                disabled={quotations.length === 0}
+                className="flex items-center gap-2 rounded-xl border border-rose-200 bg-rose-50/60 px-3 py-2 text-xs font-bold text-rose-700 hover:bg-rose-100 transition-colors shadow-sm disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+                title="Delete estimates based on weekly or monthly timeline"
+              >
+                <Trash2 className="h-3.5 w-3.5 text-rose-600" />
+                <span>Clean Up / Delete</span>
+                <ChevronDown className="h-3.5 w-3.5 text-rose-500" />
+              </button>
 
             {showPurgeMenu && (
               <div className="absolute right-0 top-11 z-30 w-72 rounded-xl border border-slate-200 bg-white p-2 shadow-xl">
@@ -128,8 +168,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             )}
           </div>
         </div>
+      </div>
 
-        <div className="overflow-x-auto rounded-xl border border-slate-200">
+      <div className="overflow-x-auto rounded-xl border border-slate-200">
           <table className="w-full text-left text-xs border-collapse">
             <thead>
               <tr className="bg-slate-100 font-bold uppercase tracking-wider text-slate-600 border-b border-slate-200">
@@ -149,8 +190,22 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                     No estimates saved in database yet. Create one from the Estimator tab.
                   </td>
                 </tr>
+              ) : filteredQuotations.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className="py-12 text-center text-slate-500">
+                    <p className="font-semibold text-sm">No estimates match your search "{searchQuery}"</p>
+                    <p className="text-xs text-slate-400 mt-1">Check for typos or search by another customer name or phone number.</p>
+                    <button
+                      type="button"
+                      onClick={() => setSearchQuery('')}
+                      className="mt-3 inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-100 cursor-pointer shadow-sm transition-colors"
+                    >
+                      Clear Search
+                    </button>
+                  </td>
+                </tr>
               ) : (
-                quotations.map((q) => (
+                filteredQuotations.map((q) => (
                   <tr key={q.id} className="hover:bg-slate-50 transition-colors">
                     <td className="py-3 px-4 font-bold text-blue-700">{q.quotation_number}</td>
                     <td className="py-3 px-4 font-semibold text-slate-900">{q.customer_name}</td>

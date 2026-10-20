@@ -31,15 +31,8 @@ export const calculateRow = (row: EstimateRow, enableListPriceMode = false): Est
   }
 
   const marginPct = Number(row.marginPercentage ?? 15)
-  // Formula: Price After Margin = Cost Price * (1 + Margin / 100)
-  const priceAfterMargin = Number((cost * (1 + marginPct / 100)).toFixed(2))
-
-  // Customer Discount (either percent % or flat ₹ rupee)
-  const dis = Number(row.discount || 0)
-  const disType = row.discountType || 'PERCENT'
-  const netPrice = disType === 'PERCENT'
-    ? Number((priceAfterMargin * (1 - dis / 100)).toFixed(2))
-    : Number(Math.max(0, priceAfterMargin - dis).toFixed(2))
+  // Formula: Net Price = Cost Price * (1 + Margin / 100)
+  const netPrice = Number((cost * (1 + marginPct / 100)).toFixed(2))
 
   const qty = Number(row.quantity || 0)
   const lineTotal = Number((netPrice * qty).toFixed(2))
@@ -48,6 +41,7 @@ export const calculateRow = (row: EstimateRow, enableListPriceMode = false): Est
     ...row,
     costPrice: cost,
     marginPercentage: marginPct,
+    discount: 0,
     price: netPrice,
     lineTotal,
   }
@@ -62,27 +56,30 @@ export interface EstimateTotals {
 }
 
 /**
- * Pure calculation of aggregated units and total sum across all estimate rows
+ * Pure calculation of aggregated units and total sum across all estimate rows.
+ * Total amount is rounded up to the next whole rupee using Math.ceil (e.g. ₹1952.30 -> ₹1953.00)
  */
 export const calculateTotals = (rows: EstimateRow[]): EstimateTotals => {
   let totalUnits = 0
-  let totalAmount = 0
+  let rawTotalAmount = 0
   let baseListSum = 0
 
   rows.forEach((r) => {
     totalUnits += Number(r.quantity || 0)
-    totalAmount += Number(r.lineTotal || 0)
+    rawTotalAmount += Number(r.lineTotal || 0)
     baseListSum += Number(r.listPrice || 0) * Number(r.quantity || 0)
   })
 
-  const totalSavings = Math.max(0, baseListSum - totalAmount)
+  // Round up total amount to the next whole rupee (e.g. 1952.30 -> 1953)
+  const totalAmount = Math.ceil(rawTotalAmount)
+  const totalSavings = Math.max(0, Math.round(baseListSum - totalAmount))
 
   return {
     itemCount: rows.length,
     totalUnits: Number(totalUnits.toFixed(2)),
-    totalAmount: Number(totalAmount.toFixed(2)),
+    totalAmount,
     baseListSum: Number(baseListSum.toFixed(2)),
-    totalSavings: Number(totalSavings.toFixed(2)),
+    totalSavings,
   }
 }
 
