@@ -54,12 +54,12 @@ describe('SkeletonLoaders', () => {
 })
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `npm test -- --run src/components/Common/SkeletonLoaders.test.tsx`  
 Expected: FAIL (module not found)
 
-- [ ] **Step 3: Implement `SkeletonLoaders.tsx`**
+- [x] **Step 3: Implement `SkeletonLoaders.tsx`**
 
 ```tsx
 // src/components/Common/SkeletonLoaders.tsx
@@ -141,12 +141,12 @@ export const CardGridSkeleton: React.FC<CardGridSkeletonProps> = ({
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `npm test -- --run src/components/Common/SkeletonLoaders.test.tsx`  
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/components/Common/SkeletonLoaders.tsx src/components/Common/SkeletonLoaders.test.tsx
@@ -168,20 +168,20 @@ git commit -m "feat(ui): add reusable table and card skeleton loaders"
 - Produces:
   - `AppSplashScreen: React.FC<{ statusMessage?: string; isDbConnected?: boolean }>`
 
-- [ ] **Step 1: Create `src/components/Common/AppSplashScreen.tsx`**
+- [x] **Step 1: Create `src/components/Common/AppSplashScreen.tsx`**
 
 Implement full-screen branded splash screen featuring Sri Venkateshwara emblem, animated pulse ring, and real-time database sync badge.
 
-- [ ] **Step 2: Add `isInitialLoading` state to `src/App.tsx`**
+- [x] **Step 2: Add `isInitialLoading` state to `src/App.tsx`**
 
 Track initial load of `checkDb()`, `loadCustomers()`, `loadProducts()`, `loadHeroProducts()`, and `loadQuotations()` in `Promise.allSettled`, setting `isInitialLoading = false` once complete.
 
-- [ ] **Step 3: Run build & test**
+- [x] **Step 3: Run build & test**
 
 Run: `npm run build`  
 Expected: PASS
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add src/components/Common/AppSplashScreen.tsx src/App.tsx
@@ -201,20 +201,20 @@ git commit -m "feat(ui): add branded initial splash screen on cold start"
   - `ErrorModal: React.FC<ErrorModalProps>`
   - Callbacks: `onRetry?: () => void`, `onEmergencyPrint?: () => void`, `onCopyDebug?: () => void`, `onClose: () => void`
 
-- [ ] **Step 1: Create `src/components/Common/ErrorModal.tsx`**
+- [x] **Step 1: Create `src/components/Common/ErrorModal.tsx`**
 
 Features bold alert banner, detailed error diagnostics, "Emergency Print Bill" (allows shopkeeper to print physical bill for the waiting customer even if saving to cloud failed), "Retry Connection", and "Dismiss".
 
-- [ ] **Step 2: Wire Error Recovery in `src/App.tsx`**
+- [x] **Step 2: Wire Error Recovery in `src/App.tsx`**
 
 In `executeSaveQuotation` and `handleSaveEstimateRequest`, catch failures and trigger `ErrorModal` with `onEmergencyPrint: () => setShowPrintModal(true)`.
 
-- [ ] **Step 3: Run build & test**
+- [x] **Step 3: Run build & test**
 
 Run: `npm run build && npm test -- --run`  
 Expected: PASS
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add src/components/Common/ErrorModal.tsx src/App.tsx
@@ -233,20 +233,20 @@ git commit -m "feat(ui): add critical error recovery modal with emergency print"
 - Produces:
   - `CatalogSyncSuccessModal: React.FC<{ isOpen: boolean; items: CatalogUpdateItem[]; onClose: () => void }>`
 
-- [ ] **Step 1: Create `src/components/Common/CatalogSyncSuccessModal.tsx`**
+- [x] **Step 1: Create `src/components/Common/CatalogSyncSuccessModal.tsx`**
 
 Displays an itemized celebration table when products are updated in the master database via `[DB]` toggle, showing Product Name, Revised List, Trade Dis%, Cost, and Margin%.
 
-- [ ] **Step 2: Wire in `src/App.tsx`**
+- [x] **Step 2: Wire in `src/App.tsx`**
 
 When `rowsToUpdate` are saved in `executeSaveQuotation`, trigger `CatalogSyncSuccessModal` to show the itemized confirmation.
 
-- [ ] **Step 3: Run build & test**
+- [x] **Step 3: Run build & test**
 
 Run: `npm run build && npm test -- --run`  
 Expected: PASS
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add src/components/Common/CatalogSyncSuccessModal.tsx src/App.tsx
@@ -263,10 +263,10 @@ git commit -m "feat(ui): add master catalog price sync success modal"
 - Modify: `src/components/HeroProducts/HeroProductsView.tsx`
 - Modify: `src/App.tsx`
 
-- [ ] **Step 1: Add `isLoading?: boolean` to view props**
-- [ ] **Step 2: Replace empty state flicker with `TableSkeleton` / `CardGridSkeleton` while `isLoading` is true**
-- [ ] **Step 3: Run all unit tests and verify 0 regressions**
-- [ ] **Step 4: Commit**
+- [x] **Step 1: Add `isLoading?: boolean` to view props**
+- [x] **Step 2: Replace empty state flicker with `TableSkeleton` / `CardGridSkeleton` while `isLoading` is true**
+- [x] **Step 3: Run all unit tests and verify 0 regressions**
+- [x] **Step 4: Commit**
 
 ```bash
 git add src/components/Dashboard/DashboardView.tsx src/components/Products/ProductsCatalog.tsx src/components/HeroProducts/HeroProductsView.tsx src/App.tsx
@@ -277,7 +277,7 @@ git commit -m "feat(ui): integrate table and card skeletons across all main view
 
 ### Task 6: End-to-End QA, Production Push & Live Verification
 
-- [ ] **Step 1: Run full test suite & production bundle build**
+- [x] **Step 1: Run full test suite & production bundle build**
 
 Run: `npm test -- --run && npm run build`
 
