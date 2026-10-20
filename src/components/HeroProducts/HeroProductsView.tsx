@@ -16,6 +16,7 @@ import { formatINR } from '../../lib/pricing'
 export interface HeroProductsViewProps {
   heroProducts: HeroProductWithChildren[]
   allProducts: Product[]
+  isLoading?: boolean
   onToggleHero: (product: Product) => Promise<void>
   onAddChild: (heroProductId: number, childProductId: number, defaultQuantity: number) => Promise<boolean>
   onUpdateChildQuantity: (childMappingId: number, defaultQuantity: number) => Promise<void>
@@ -26,6 +27,7 @@ export interface HeroProductsViewProps {
 export const HeroProductsView: React.FC<HeroProductsViewProps> = ({
   heroProducts,
   allProducts,
+  isLoading = false,
   onToggleHero,
   onAddChild,
   onUpdateChildQuantity,
@@ -193,7 +195,15 @@ export const HeroProductsView: React.FC<HeroProductsViewProps> = ({
             </div>
 
             <div className="space-y-1.5 max-h-[600px] overflow-y-auto pr-1">
-              {filteredHeroProducts.map((h) => {
+              {isLoading ? (
+                Array.from({ length: 4 }).map((_, idx) => (
+                  <div key={idx} className="p-3 rounded-xl border border-slate-100 bg-slate-50 animate-pulse space-y-2">
+                    <div className="h-3.5 bg-slate-200 rounded w-3/4" />
+                    <div className="h-3 bg-slate-100 rounded w-1/2" />
+                  </div>
+                ))
+              ) : (
+                filteredHeroProducts.map((h) => {
                 const isSelected = activeHero?.id === h.id
                 return (
                   <button
@@ -227,7 +237,7 @@ export const HeroProductsView: React.FC<HeroProductsViewProps> = ({
                     </span>
                   </button>
                 )
-              })}
+              }))}
             </div>
           </div>
 

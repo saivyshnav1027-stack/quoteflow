@@ -20,6 +20,7 @@ import { PrintSlipModal } from './components/Slip/PrintSlipModal'
 import { ConfirmModal } from './components/Common/ConfirmModal'
 import { EstimateSavedModal } from './components/Common/EstimateSavedModal'
 import { ToastContainer, type ToastMessage } from './components/Common/Toast'
+import { AppSplashScreen } from './components/Common/AppSplashScreen'
 
 import { INITIAL_PRODUCTS, INITIAL_CUSTOMERS } from './lib/constants'
 
@@ -59,6 +60,11 @@ function App() {
   const [heroProducts, setHeroProducts] = useState<HeroProductWithChildren[]>([])
   const [customers, setCustomers] = useState<Customer[]>(INITIAL_CUSTOMERS)
   const [quotations, setQuotations] = useState<Quotation[]>([])
+  const [isInitialLoading, setIsInitialLoading] = useState(true)
+  const [initialLoadingStatus, setInitialLoadingStatus] = useState('Connecting to Turso Cloud DB...')
+  const [isQuotationsLoading, setIsQuotationsLoading] = useState(false)
+  const [isProductsLoading, setIsProductsLoading] = useState(false)
+  const [isHeroLoading, setIsHeroLoading] = useState(false)
   const [dbStatus, setDbStatus] = useState<{ isConnected: boolean; isUsingTurso: boolean; message: string }>({
     isConnected: true,
     isUsingTurso: true,
@@ -196,11 +202,25 @@ function App() {
   }
 
   useEffect(() => {
-    checkDb()
-    loadCustomers()
-    loadProducts()
-    loadHeroProducts()
-    loadQuotations()
+    const initApp = async () => {
+      setIsInitialLoading(true)
+      setIsQuotationsLoading(true)
+      setIsProductsLoading(true)
+      setIsHeroLoading(true)
+      setInitialLoadingStatus('Connecting to Turso Cloud DB...')
+      await checkDb()
+      setInitialLoadingStatus('Loading Products Catalog & Customers...')
+      await Promise.allSettled([loadCustomers(), loadProducts()])
+      setIsProductsLoading(false)
+      setInitialLoadingStatus('Loading Hero Bundles & Recent Quotations...')
+      await Promise.allSettled([loadHeroProducts(), loadQuotations()])
+      setIsHeroLoading(false)
+      setIsQuotationsLoading(false)
+      setTimeout(() => {
+        setIsInitialLoading(false)
+      }, 350)
+    }
+    initApp()
   }, [])
 
   // Hero Products Handlers
@@ -1087,6 +1107,7 @@ function App() {
           {activePage === 'Dashboard' && (
             <DashboardView
               quotations={quotations}
+              isLoading={isQuotationsLoading}
               onCreateEstimateClick={() => setActivePage('Estimator')}
               onViewPrintSlip={handleViewQuotationPrintSlip}
               onEditQuotation={handleEditQuotation}
@@ -1136,6 +1157,7 @@ function App() {
           {activePage === 'Products' && (
             <ProductsCatalog
               products={products}
+              isLoading={isProductsLoading}
               enableListPriceMode={enableListPriceMode}
               onAddProductClick={() => {
                 setNewProductPrefillName('')
@@ -1152,6 +1174,7 @@ function App() {
             <HeroProductsView
               heroProducts={heroProducts}
               allProducts={products}
+              isLoading={isHeroLoading}
               onToggleHero={handleToggleHeroProduct}
               onAddChild={handleLinkChildToHero}
               onUpdateChildQuantity={handleUpdateChildQuantity}
@@ -1254,6 +1277,14 @@ function App() {
             clearCurrentEstimateDirect()
           }}
           onClose={() => setSavedModalData(null)}
+        />
+      )}
+
+      {/* Branded Cold-Start Initial Splash Screen */}
+      {isInitialLoading && (
+        <AppSplashScreen
+          statusMessage={initialLoadingStatus}
+          isDbConnected={dbStatus.isConnected}
         />
       )}
 

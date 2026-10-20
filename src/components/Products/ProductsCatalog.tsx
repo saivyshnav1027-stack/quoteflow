@@ -5,6 +5,7 @@ import { formatINR } from '../../lib/pricing'
 
 export interface ProductsCatalogProps {
   products: Product[]
+  isLoading?: boolean
   enableListPriceMode: boolean
   onAddProductClick: () => void
   onEditProduct: (product: Product) => void
@@ -14,6 +15,7 @@ export interface ProductsCatalogProps {
 
 export const ProductsCatalog: React.FC<ProductsCatalogProps> = ({
   products,
+  isLoading = false,
   enableListPriceMode,
   onAddProductClick,
   onEditProduct,
@@ -78,7 +80,31 @@ export const ProductsCatalog: React.FC<ProductsCatalogProps> = ({
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 text-slate-800 font-medium">
-              {filteredProducts.map((p) => (
+              {isLoading ? (
+                Array.from({ length: 6 }).map((_, idx) => (
+                  <tr key={idx} className="animate-pulse">
+                    <td className="py-3 px-4"><div className="h-4 bg-slate-200 rounded w-20" /></td>
+                    <td className="py-3 px-4"><div className="h-4 bg-slate-200 rounded w-44" /></td>
+                    <td className="py-3 px-3"><div className="h-4 bg-slate-100 rounded w-12" /></td>
+                    {enableListPriceMode && (
+                      <>
+                        <td className="py-3 px-4 text-right"><div className="h-4 bg-slate-200 rounded w-16 ml-auto" /></td>
+                        <td className="py-3 px-3 text-right"><div className="h-4 bg-emerald-100 rounded w-12 ml-auto" /></td>
+                      </>
+                    )}
+                    <td className="py-3 px-4 text-right"><div className="h-4 bg-slate-200 rounded w-16 ml-auto" /></td>
+                    <td className="py-3 px-3 text-right"><div className="h-4 bg-blue-100 rounded w-12 ml-auto" /></td>
+                    <td className="py-3 px-4 text-center"><div className="h-6 bg-slate-100 rounded-lg w-20 mx-auto" /></td>
+                  </tr>
+                ))
+              ) : filteredProducts.length === 0 ? (
+                <tr>
+                  <td colSpan={enableListPriceMode ? 8 : 6} className="py-12 text-center text-slate-400">
+                    No products found matching your search.
+                  </td>
+                </tr>
+              ) : (
+                filteredProducts.map((p) => (
                 <tr key={p.id} className="hover:bg-slate-50 transition-colors">
                   <td className="py-3 px-4 font-bold text-slate-600">{p.product_code}</td>
                   <td className="py-3 px-4 font-semibold text-slate-900">{p.product_name}</td>
@@ -151,7 +177,7 @@ export const ProductsCatalog: React.FC<ProductsCatalogProps> = ({
                     </button>
                   </td>
                 </tr>
-              ))}
+              )))}
             </tbody>
           </table>
         </div>

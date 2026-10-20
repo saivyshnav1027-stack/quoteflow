@@ -5,6 +5,7 @@ import { formatINR } from '../../lib/pricing'
 
 export interface DashboardViewProps {
   quotations: Quotation[]
+  isLoading?: boolean
   onCreateEstimateClick: () => void
   onViewPrintSlip: (quotation: Quotation) => void
   onEditQuotation?: (quotation: Quotation) => void
@@ -14,6 +15,7 @@ export interface DashboardViewProps {
 
 export const DashboardView: React.FC<DashboardViewProps> = ({
   quotations,
+  isLoading = false,
   onCreateEstimateClick,
   onViewPrintSlip,
   onEditQuotation,
@@ -184,7 +186,19 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 text-slate-800 font-medium">
-              {quotations.length === 0 ? (
+              {isLoading ? (
+                Array.from({ length: 5 }).map((_, idx) => (
+                  <tr key={idx} className="animate-pulse">
+                    <td className="py-3.5 px-4"><div className="h-4 bg-slate-200 rounded w-24" /></td>
+                    <td className="py-3.5 px-4"><div className="h-4 bg-slate-200 rounded w-36" /></td>
+                    <td className="py-3.5 px-4"><div className="h-3.5 bg-slate-100 rounded w-28" /></td>
+                    <td className="py-3.5 px-4 text-right"><div className="h-4 bg-slate-100 rounded w-12 ml-auto" /></td>
+                    <td className="py-3.5 px-4 text-right"><div className="h-4 bg-slate-200 rounded w-20 ml-auto" /></td>
+                    <td className="py-3.5 px-4"><div className="h-3.5 bg-slate-100 rounded w-20" /></td>
+                    <td className="py-3.5 px-4 text-center"><div className="h-7 bg-slate-200 rounded-lg w-28 mx-auto" /></td>
+                  </tr>
+                ))
+              ) : quotations.length === 0 ? (
                 <tr>
                   <td colSpan={7} className="py-12 text-center text-slate-400">
                     No estimates saved in database yet. Create one from the Estimator tab.
