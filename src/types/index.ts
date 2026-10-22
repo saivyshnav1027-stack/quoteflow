@@ -101,3 +101,5 @@ export interface PrintQuoteData {
 
 export type ActivePage = 'Dashboard' | 'Estimator' | 'Products' | 'HeroProducts' | 'Customers' | 'Settings'
 
+export type PricingSuperiorityMode = 'PRICE' | 'PERCENTAGE'
+

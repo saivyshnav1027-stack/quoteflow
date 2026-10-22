@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
-import { X, Loader2 } from 'lucide-react'
-import type { Product } from '../../types'
+import { X, Loader2, Sparkles } from 'lucide-react'
+import type { Product, PricingSuperiorityMode } from '../../types'
 import {
   calculateCostFromListAndDiscount,
   calculateDiscountFromListAndCost,
@@ -11,6 +11,7 @@ import {
 export interface EditProductModalProps {
   product: Product | null
   enableListPriceMode: boolean
+  defaultSuperiorityMode?: PricingSuperiorityMode
   onClose: () => void
   onSave: (product: Product) => Promise<void>
 }
@@ -18,15 +19,18 @@ export interface EditProductModalProps {
 export const EditProductModal: React.FC<EditProductModalProps> = ({
   product,
   enableListPriceMode,
+  defaultSuperiorityMode = 'PRICE',
   onClose,
   onSave,
 }) => {
   const [formData, setFormData] = useState<Product | null>(product)
+  const [superiorityMode, setSuperiorityMode] = useState<PricingSuperiorityMode>(defaultSuperiorityMode)
   const [netPrice, setNetPrice] = useState<number | ''>('')
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   useEffect(() => {
     setFormData(product)
+    setSuperiorityMode(defaultSuperiorityMode)
     if (product) {
       setNetPrice(
         calculateNetPriceFromCostAndMargin(product.cost_price, product.margin_percentage ?? 15)
@@ -34,7 +38,7 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({
     } else {
       setNetPrice('')
     }
-  }, [product])
+  }, [product, defaultSuperiorityMode])
 
   if (!product || !formData) return null
 
@@ -106,6 +110,40 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({
             </div>
           </div>
 
+          {/* Superiority Priority Mode Toggle Pill */}
+          <div className="flex items-center justify-between bg-slate-50 border border-slate-200/80 rounded-2xl px-3.5 py-2">
+            <div className="flex items-center space-x-1.5 text-xs font-semibold text-slate-700">
+              <Sparkles className="h-3.5 w-3.5 text-indigo-600" />
+              <span>Priority:</span>
+            </div>
+            <div className="flex items-center space-x-1 bg-white border border-slate-200 rounded-xl p-0.5">
+              <button
+                type="button"
+                onClick={() => setSuperiorityMode('PRICE')}
+                className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                  superiorityMode === 'PRICE'
+                    ? 'bg-emerald-600 text-white shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+                title="Cost Price (₹) & Net Price (₹) are ground truth. Trade Dis% and Margin% are derived."
+              >
+                ₹ Amounts Superior
+              </button>
+              <button
+                type="button"
+                onClick={() => setSuperiorityMode('PERCENTAGE')}
+                className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                  superiorityMode === 'PERCENTAGE'
+                    ? 'bg-blue-600 text-white shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+                title="Trade Discount % & Margin % are locked. Cost Price and Net Price are recomputed."
+              >
+                % Percentages Superior
+              </button>
+            </div>
+          </div>
+
           {enableListPriceMode ? (
             <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5">
               <div>
@@ -117,16 +155,28 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({
                   onChange={(e) => {
                     const list = parseFloat(e.target.value) || 0
                     const dis = formData.discount_percentage || 0
+                    const cost = formData.cost_price || 0
                     const m = formData.margin_percentage ?? 15
-                    const cost = calculateCostFromListAndDiscount(list, dis)
-                    setFormData({ ...formData, list_price: list, cost_price: cost })
-                    setNetPrice(calculateNetPriceFromCostAndMargin(cost, m))
+                    if (list > 0) {
+                      if (superiorityMode === 'PRICE' && cost > 0) {
+                        const newDis = calculateDiscountFromListAndCost(list, cost)
+                        setFormData({ ...formData, list_price: list, discount_percentage: newDis })
+                      } else {
+                        const newCost = calculateCostFromListAndDiscount(list, dis)
+                        setFormData({ ...formData, list_price: list, cost_price: newCost })
+                        setNetPrice(calculateNetPriceFromCostAndMargin(newCost, m))
+                      }
+                    } else {
+                      setFormData({ ...formData, list_price: list })
+                    }
                   }}
                   className="w-full rounded-xl border border-slate-200 px-2.5 py-2 text-xs outline-none focus:border-blue-500 font-bold"
                 />
               </div>
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">Trade Dis%</label>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  Trade Dis% {superiorityMode === 'PERCENTAGE' && <span className="text-[10px] text-blue-600 font-extrabold">★</span>}
+                </label>
                 <input
                   type="number"
                   step="0.01"
@@ -139,11 +189,15 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({
                     setFormData({ ...formData, discount_percentage: dis, cost_price: cost })
                     setNetPrice(calculateNetPriceFromCostAndMargin(cost, m))
                   }}
-                  className="w-full rounded-xl border border-slate-200 px-2.5 py-2 text-xs outline-none focus:border-blue-500 font-bold text-emerald-600"
+                  className={`w-full rounded-xl border px-2.5 py-2 text-xs outline-none font-bold text-emerald-600 ${
+                    superiorityMode === 'PERCENTAGE' ? 'border-blue-400 ring-1 ring-blue-300' : 'border-slate-200 focus:border-blue-500'
+                  }`}
                 />
               </div>
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">Cost (₹)</label>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  Cost (₹) {superiorityMode === 'PRICE' && <span className="text-[10px] text-emerald-600 font-extrabold">★</span>}
+                </label>
                 <input
                   type="number"
                   step="0.01"
@@ -152,18 +206,29 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({
                     const cost = parseFloat(e.target.value) || 0
                     const list = formData.list_price || 0
                     const m = formData.margin_percentage ?? 15
+                    const n = typeof netPrice === 'number' ? netPrice : 0
                     const dis =
                       list > 0 && cost > 0
                         ? calculateDiscountFromListAndCost(list, cost)
                         : formData.discount_percentage
-                    setFormData({ ...formData, cost_price: cost, discount_percentage: dis })
-                    setNetPrice(calculateNetPriceFromCostAndMargin(cost, m))
+
+                    if (cost > 0 && superiorityMode === 'PRICE' && n > 0) {
+                      const newM = calculateMarginFromCostAndNetPrice(cost, n)
+                      setFormData({ ...formData, cost_price: cost, discount_percentage: dis, margin_percentage: newM })
+                    } else {
+                      setFormData({ ...formData, cost_price: cost, discount_percentage: dis })
+                      setNetPrice(calculateNetPriceFromCostAndMargin(cost, m))
+                    }
                   }}
-                  className="w-full rounded-xl border border-slate-200 px-2.5 py-2 text-xs outline-none focus:border-blue-500 font-bold text-slate-700"
+                  className={`w-full rounded-xl border px-2.5 py-2 text-xs outline-none font-bold text-slate-700 ${
+                    superiorityMode === 'PRICE' ? 'border-emerald-400 ring-1 ring-emerald-300' : 'border-slate-200 focus:border-blue-500'
+                  }`}
                 />
               </div>
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">Margin%</label>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  Margin% {superiorityMode === 'PERCENTAGE' && <span className="text-[10px] text-blue-600 font-extrabold">★</span>}
+                </label>
                 <input
                   type="number"
                   step="0.5"
@@ -176,11 +241,15 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({
                     })
                     setNetPrice(calculateNetPriceFromCostAndMargin(formData.cost_price, m))
                   }}
-                  className="w-full rounded-xl border border-blue-200 bg-blue-50/40 px-2.5 py-2 text-xs outline-none focus:border-blue-500 font-bold text-blue-700"
+                  className={`w-full rounded-xl border bg-blue-50/40 px-2.5 py-2 text-xs outline-none font-bold text-blue-700 ${
+                    superiorityMode === 'PERCENTAGE' ? 'border-blue-400 ring-1 ring-blue-300' : 'border-blue-200 focus:border-blue-500'
+                  }`}
                 />
               </div>
               <div>
-                <label className="block text-xs font-bold text-emerald-700 mb-1">Net Price (₹)</label>
+                <label className="block text-xs font-bold text-emerald-700 mb-1">
+                  Net Price (₹) {superiorityMode === 'PRICE' && <span className="text-[10px] text-emerald-600 font-extrabold">★</span>}
+                </label>
                 <input
                   type="number"
                   step="0.01"
@@ -197,7 +266,9 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({
                       })
                     }
                   }}
-                  className="w-full rounded-xl border border-emerald-300 bg-emerald-50/50 px-2.5 py-2 text-xs outline-none focus:border-emerald-500 font-mono font-bold text-emerald-800"
+                  className={`w-full rounded-xl border bg-emerald-50/50 px-2.5 py-2 text-xs outline-none font-mono font-bold text-emerald-800 ${
+                    superiorityMode === 'PRICE' ? 'border-emerald-500 ring-1 ring-emerald-300' : 'border-emerald-300 focus:border-emerald-500'
+                  }`}
                   title="Net selling price (auto updates margin %)"
                 />
               </div>
@@ -205,7 +276,9 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">Cost Price (₹)</label>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  Cost Price (₹) {superiorityMode === 'PRICE' && <span className="text-[10px] text-emerald-600 font-extrabold">★</span>}
+                </label>
                 <input
                   type="number"
                   step="0.01"
@@ -213,14 +286,24 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({
                   onChange={(e) => {
                     const cost = parseFloat(e.target.value) || 0
                     const m = formData.margin_percentage ?? 15
-                    setFormData({ ...formData, cost_price: cost })
-                    setNetPrice(calculateNetPriceFromCostAndMargin(cost, m))
+                    const n = typeof netPrice === 'number' ? netPrice : 0
+                    if (cost > 0 && superiorityMode === 'PRICE' && n > 0) {
+                      const newM = calculateMarginFromCostAndNetPrice(cost, n)
+                      setFormData({ ...formData, cost_price: cost, margin_percentage: newM })
+                    } else {
+                      setFormData({ ...formData, cost_price: cost })
+                      setNetPrice(calculateNetPriceFromCostAndMargin(cost, m))
+                    }
                   }}
-                  className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-500 font-bold text-slate-900"
+                  className={`w-full rounded-xl border px-3 py-2 text-sm outline-none font-bold text-slate-900 ${
+                    superiorityMode === 'PRICE' ? 'border-emerald-400 ring-1 ring-emerald-300' : 'border-slate-200 focus:border-blue-500'
+                  }`}
                 />
               </div>
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">Margin (%)</label>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  Margin (%) {superiorityMode === 'PERCENTAGE' && <span className="text-[10px] text-blue-600 font-extrabold">★</span>}
+                </label>
                 <input
                   type="number"
                   step="0.5"
@@ -233,11 +316,15 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({
                     })
                     setNetPrice(calculateNetPriceFromCostAndMargin(formData.cost_price, m))
                   }}
-                  className="w-full rounded-xl border border-blue-200 bg-blue-50/40 px-3 py-2 text-sm outline-none focus:border-blue-500 font-bold text-blue-700"
+                  className={`w-full rounded-xl border bg-blue-50/40 px-3 py-2 text-sm outline-none font-bold text-blue-700 ${
+                    superiorityMode === 'PERCENTAGE' ? 'border-blue-400 ring-1 ring-blue-300' : 'border-blue-200 focus:border-blue-500'
+                  }`}
                 />
               </div>
               <div>
-                <label className="block text-xs font-bold text-emerald-700 mb-1">Net Price (₹)</label>
+                <label className="block text-xs font-bold text-emerald-700 mb-1">
+                  Net Price (₹) {superiorityMode === 'PRICE' && <span className="text-[10px] text-emerald-600 font-extrabold">★</span>}
+                </label>
                 <input
                   type="number"
                   step="0.01"
@@ -254,7 +341,9 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({
                       })
                     }
                   }}
-                  className="w-full rounded-xl border border-emerald-300 bg-emerald-50/50 px-3 py-2 text-sm outline-none focus:border-emerald-500 font-mono font-bold text-emerald-800"
+                  className={`w-full rounded-xl border bg-emerald-50/50 px-3 py-2 text-sm outline-none font-mono font-bold text-emerald-800 ${
+                    superiorityMode === 'PRICE' ? 'border-emerald-500 ring-1 ring-emerald-300' : 'border-emerald-300 focus:border-emerald-500'
+                  }`}
                   title="Net selling price (auto updates margin %)"
                 />
               </div>

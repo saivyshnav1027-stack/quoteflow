@@ -1,6 +1,6 @@
 import { useEffect, useState, useMemo } from 'react'
 import { CheckCircle2 } from 'lucide-react'
-import type { Customer, Product, EstimateRow, Quotation, PrintQuoteData, ActivePage, HeroProductWithChildren } from './types'
+import type { Customer, Product, EstimateRow, Quotation, PrintQuoteData, ActivePage, HeroProductWithChildren, PricingSuperiorityMode } from './types'
 import { calculateRow as calcRow, calculateTotals } from './lib/pricing'
 import { getWhatsAppShareUrl } from './lib/whatsapp'
 import { getNextEstimateNumber, incrementEstimateNumber, getTodayDatePrefix } from './lib/estimateNumber'
@@ -55,6 +55,15 @@ function App() {
   const toggleListPriceMode = (val: boolean) => {
     setEnableListPriceMode(val)
     localStorage.setItem('quoteflow_flag_list_price', String(val))
+  }
+
+  const [pricingSuperiorityMode, setPricingSuperiorityMode] = useState<PricingSuperiorityMode>(() => {
+    return (localStorage.getItem('quoteflow_pricing_superiority') as PricingSuperiorityMode) || 'PRICE'
+  })
+
+  const togglePricingSuperiority = (val: PricingSuperiorityMode) => {
+    setPricingSuperiorityMode(val)
+    localStorage.setItem('quoteflow_pricing_superiority', val)
   }
 
   // Global Data
@@ -1239,6 +1248,7 @@ function App() {
               onDeleteProduct={handleDeleteProduct}
               onToggleHero={handleToggleHeroProduct}
               onRefreshProducts={loadProducts}
+              pricingSuperiorityMode={pricingSuperiorityMode}
             />
           )}
 
@@ -1271,6 +1281,8 @@ function App() {
             <AdminSettingsView
               enableListPriceMode={enableListPriceMode}
               onToggleListPriceMode={toggleListPriceMode}
+              pricingSuperiorityMode={pricingSuperiorityMode}
+              onTogglePricingSuperiority={togglePricingSuperiority}
               onCleanSlatePurge={async () => {
                 await Promise.all([
                   loadProducts(),
@@ -1302,6 +1314,7 @@ function App() {
       <AddProductModal
         isOpen={showNewProductModal}
         enableListPriceMode={enableListPriceMode}
+        defaultSuperiorityMode={pricingSuperiorityMode}
         initialName={newProductPrefillName}
         showAddToQuoteOption={newProductFromEstimator}
         onClose={() => {
@@ -1314,6 +1327,7 @@ function App() {
       <EditProductModal
         product={editProduct}
         enableListPriceMode={enableListPriceMode}
+        defaultSuperiorityMode={pricingSuperiorityMode}
         onClose={() => setEditProduct(null)}
         onSave={handleEditProduct}
       />

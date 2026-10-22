@@ -8,7 +8,7 @@ import {
   Sparkles,
 } from 'lucide-react'
 import * as XLSX from 'xlsx'
-import type { Product } from '../../types'
+import type { Product, PricingSuperiorityMode } from '../../types'
 import {
   type RawImportRow,
   type ValidatedImportRow,
@@ -22,6 +22,7 @@ import { BulkUploadProgressModal } from './BulkUploadProgressModal'
 export interface BulkUploadModalProps {
   isOpen: boolean
   existingProducts: Product[]
+  defaultSuperiorityMode?: PricingSuperiorityMode
   onClose: () => void
   onSuccess: () => Promise<void>
 }
@@ -29,10 +30,13 @@ export interface BulkUploadModalProps {
 export const BulkUploadModal: React.FC<BulkUploadModalProps> = ({
   isOpen,
   existingProducts,
+  defaultSuperiorityMode = 'PRICE',
   onClose,
   onSuccess,
 }) => {
-  const [calculationMode, setCalculationMode] = useState<PricingCalculationMode>('MODE_A')
+  const [calculationMode, setCalculationMode] = useState<PricingCalculationMode>(
+    defaultSuperiorityMode === 'PERCENTAGE' ? 'MODE_B' : 'MODE_A'
+  )
   const [rawRows, setRawRows] = useState<RawImportRow[]>([])
   const [fileName, setFileName] = useState<string>('')
   const [parseError, setParseError] = useState<string>('')

@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
 import { Plus, Pencil, Trash2, Sparkles, UploadCloud, Download, FileSpreadsheet } from 'lucide-react'
-import type { Product } from '../../types'
+import type { Product, PricingSuperiorityMode } from '../../types'
 import { formatINR } from '../../lib/pricing'
 import { downloadCatalogTemplate, exportCatalogToExcel } from '../../lib/excelTemplate'
 import { BulkUploadModal } from './BulkUploadModal'
@@ -9,6 +9,7 @@ export interface ProductsCatalogProps {
   products: Product[]
   isLoading?: boolean
   enableListPriceMode: boolean
+  pricingSuperiorityMode?: PricingSuperiorityMode
   onAddProductClick: () => void
   onEditProduct: (product: Product) => void
   onDeleteProduct: (product: Product) => Promise<void> | void
@@ -20,6 +21,7 @@ export const ProductsCatalog: React.FC<ProductsCatalogProps> = ({
   products,
   isLoading = false,
   enableListPriceMode,
+  pricingSuperiorityMode,
   onAddProductClick,
   onEditProduct,
   onDeleteProduct,
@@ -222,6 +224,7 @@ export const ProductsCatalog: React.FC<ProductsCatalogProps> = ({
       <BulkUploadModal
         isOpen={showBulkUploadModal}
         existingProducts={products}
+        defaultSuperiorityMode={pricingSuperiorityMode}
         onClose={() => setShowBulkUploadModal(false)}
         onSuccess={async () => {
           if (onRefreshProducts) {

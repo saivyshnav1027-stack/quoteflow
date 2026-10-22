@@ -1,15 +1,20 @@
 import React, { useState } from 'react'
-import { AlertOctagon, Trash2, CheckCircle2, AlertTriangle, X, Loader2 } from 'lucide-react'
+import { AlertOctagon, Trash2, CheckCircle2, AlertTriangle, X, Loader2, Sparkles } from 'lucide-react'
+import type { PricingSuperiorityMode } from '../../types'
 
 export interface AdminSettingsViewProps {
   enableListPriceMode: boolean
   onToggleListPriceMode: (enabled: boolean) => void
+  pricingSuperiorityMode?: PricingSuperiorityMode
+  onTogglePricingSuperiority?: (mode: PricingSuperiorityMode) => void
   onCleanSlatePurge?: () => Promise<void>
 }
 
 export const AdminSettingsView: React.FC<AdminSettingsViewProps> = ({
   enableListPriceMode,
   onToggleListPriceMode,
+  pricingSuperiorityMode = 'PRICE',
+  onTogglePricingSuperiority,
   onCleanSlatePurge,
 }) => {
   const [showPurgeModal, setShowPurgeModal] = useState(false)
@@ -111,6 +116,101 @@ export const AdminSettingsView: React.FC<AdminSettingsViewProps> = ({
                 }`}
               />
             </button>
+          </div>
+        </div>
+
+        {/* Feature Flag 2: Pricing Calculation Superiority Mode */}
+        <div className="rounded-2xl bg-white p-6 shadow-sm border border-slate-200/80 flex flex-col justify-between">
+          <div>
+            <div className="flex items-center justify-between mb-4">
+              <span className="rounded-full bg-indigo-50 px-3 py-1 text-xs font-bold text-indigo-700 flex items-center space-x-1">
+                <Sparkles className="h-3 w-3" />
+                <span>Calculation Engine Priority</span>
+              </span>
+              <span
+                className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold ${
+                  pricingSuperiorityMode === 'PRICE'
+                    ? 'bg-emerald-100 text-emerald-800'
+                    : 'bg-blue-100 text-blue-800'
+                }`}
+              >
+                {pricingSuperiorityMode === 'PRICE' ? '₹ AMOUNTS SUPERIOR' : '% PERCENTAGES SUPERIOR'}
+              </span>
+            </div>
+            <h3 className="text-lg font-bold text-slate-900">
+              Calculation Superiority Priority
+            </h3>
+            <p className="text-xs text-slate-600 mt-2 leading-relaxed">
+              Determines which values are treated as sacred ground truth during catalog entry and estimator price recalculations:
+            </p>
+
+            <div className="mt-3 space-y-2">
+              <div
+                onClick={() => onTogglePricingSuperiority && onTogglePricingSuperiority('PRICE')}
+                className={`p-2.5 rounded-xl border text-xs cursor-pointer transition-all ${
+                  pricingSuperiorityMode === 'PRICE'
+                    ? 'border-emerald-500 bg-emerald-50/60 ring-1 ring-emerald-500 text-slate-800'
+                    : 'border-slate-200 bg-slate-50/50 hover:bg-slate-50 text-slate-600'
+                }`}
+              >
+                <div className="font-extrabold flex items-center justify-between text-slate-900">
+                  <span>₹ Rupee Amounts Superior (Cost & Net Price)</span>
+                  {pricingSuperiorityMode === 'PRICE' && (
+                    <span className="text-[10px] bg-emerald-600 text-white px-2 py-0.5 rounded-full font-bold">Active</span>
+                  )}
+                </div>
+                <div className="text-[11px] text-slate-500 mt-0.5">
+                  Cost Price (₹) and Net Price (₹) remain fixed. Automatically calculates Trade Discount % and Margin %, preventing counter penny roundoff shifts.
+                </div>
+              </div>
+
+              <div
+                onClick={() => onTogglePricingSuperiority && onTogglePricingSuperiority('PERCENTAGE')}
+                className={`p-2.5 rounded-xl border text-xs cursor-pointer transition-all ${
+                  pricingSuperiorityMode === 'PERCENTAGE'
+                    ? 'border-blue-500 bg-blue-50/60 ring-1 ring-blue-500 text-slate-800'
+                    : 'border-slate-200 bg-slate-50/50 hover:bg-slate-50 text-slate-600'
+                }`}
+              >
+                <div className="font-extrabold flex items-center justify-between text-slate-900">
+                  <span>% Percentages Superior (Trade Dis% & Margin%)</span>
+                  {pricingSuperiorityMode === 'PERCENTAGE' && (
+                    <span className="text-[10px] bg-blue-600 text-white px-2 py-0.5 rounded-full font-bold">Active</span>
+                  )}
+                </div>
+                <div className="text-[11px] text-slate-500 mt-0.5">
+                  Trade Discount % and Margin % remain locked. Cost Price and Net Price automatically recompute when manufacturer list prices change.
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-6 pt-4 border-t border-slate-100 flex items-center justify-between">
+            <span className="text-xs font-bold text-slate-700">Superior Value:</span>
+            <div className="inline-flex rounded-xl bg-slate-100 p-0.5">
+              <button
+                type="button"
+                onClick={() => onTogglePricingSuperiority && onTogglePricingSuperiority('PRICE')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                  pricingSuperiorityMode === 'PRICE'
+                    ? 'bg-white text-emerald-800 shadow-sm'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                ₹ Amounts
+              </button>
+              <button
+                type="button"
+                onClick={() => onTogglePricingSuperiority && onTogglePricingSuperiority('PERCENTAGE')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                  pricingSuperiorityMode === 'PERCENTAGE'
+                    ? 'bg-white text-blue-800 shadow-sm'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                % Percentages
+              </button>
+            </div>
           </div>
         </div>
 
