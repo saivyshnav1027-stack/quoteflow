@@ -8,6 +8,7 @@ export interface AdminSettingsViewProps {
   pricingSuperiorityMode?: PricingSuperiorityMode
   onTogglePricingSuperiority?: (mode: PricingSuperiorityMode) => void
   onCleanSlatePurge?: () => Promise<void>
+  onPurgeQa?: () => Promise<void>
 }
 
 export const AdminSettingsView: React.FC<AdminSettingsViewProps> = ({
@@ -16,12 +17,19 @@ export const AdminSettingsView: React.FC<AdminSettingsViewProps> = ({
   pricingSuperiorityMode = 'PRICE',
   onTogglePricingSuperiority,
   onCleanSlatePurge,
+  onPurgeQa,
 }) => {
   const [showPurgeModal, setShowPurgeModal] = useState(false)
   const [confirmInput, setConfirmInput] = useState('')
   const [isPurging, setIsPurging] = useState(false)
   const [purgeSuccess, setPurgeSuccess] = useState(false)
   const [purgeError, setPurgeError] = useState('')
+
+  // QA Purge state
+  const [showQaPurgeModal, setShowQaPurgeModal] = useState(false)
+  const [isPurgingQa, setIsPurgingQa] = useState(false)
+  const [qaPurgeCount, setQaPurgeCount] = useState<number | null>(null)
+  const [qaPurgeError, setQaPurgeError] = useState('')
 
   const handleExecutePurge = async () => {
     if (confirmInput.trim() !== 'PURGE ALL DATA') return
@@ -58,6 +66,35 @@ export const AdminSettingsView: React.FC<AdminSettingsViewProps> = ({
     setConfirmInput('')
     setPurgeSuccess(false)
     setPurgeError('')
+  }
+
+  const handleExecuteQaPurge = async () => {
+    setIsPurgingQa(true)
+    setQaPurgeError('')
+    try {
+      const res = await fetch('/api/products?action=purge-qa', {
+        method: 'DELETE',
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        throw new Error(data.message || 'Failed to purge QA test records')
+      }
+      setQaPurgeCount(data.deletedCount ?? 0)
+      if (onPurgeQa) {
+        await onPurgeQa()
+      }
+    } catch (err: any) {
+      console.error(err)
+      setQaPurgeError(err.message || 'An error occurred during QA purge.')
+    } finally {
+      setIsPurgingQa(false)
+    }
+  }
+
+  const handleCloseQaModal = () => {
+    setShowQaPurgeModal(false)
+    setQaPurgeCount(null)
+    setQaPurgeError('')
   }
 
   return (
@@ -249,6 +286,42 @@ export const AdminSettingsView: React.FC<AdminSettingsViewProps> = ({
             </button>
           </div>
         </div>
+
+        {/* Maintenance: QA Test Records Purge */}
+        <div className="rounded-2xl bg-white p-6 shadow-sm border border-amber-200/80 flex flex-col justify-between">
+          <div>
+            <div className="flex items-center justify-between mb-4">
+              <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-bold text-amber-800 flex items-center space-x-1.5">
+                <AlertTriangle className="h-3.5 w-3.5" />
+                <span>Test Data Management</span>
+              </span>
+              <span className="text-xs font-mono font-bold text-amber-700">
+                SAFE PURGE
+              </span>
+            </div>
+            <h3 className="text-lg font-bold text-slate-900">
+              Purge QA Test Records
+            </h3>
+            <p className="text-xs text-slate-600 mt-2 leading-relaxed">
+              Safely deletes only products created for testing (prefix <b>QA_*</b>) and their references in quotations and bundles.
+              <br />
+              <br />
+              <b>Genuine stock catalog items, customers, and active production estimates remain untouched.</b>
+            </p>
+          </div>
+
+          <div className="mt-6 pt-4 border-t border-amber-100 flex items-center justify-between">
+            <span className="text-xs font-bold text-slate-700">Clear QA Products:</span>
+            <button
+              type="button"
+              onClick={() => setShowQaPurgeModal(true)}
+              className="inline-flex items-center space-x-1.5 px-3.5 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs shadow-sm shadow-amber-500/20 cursor-pointer transition-all active:scale-[0.98]"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+              <span>Purge QA Products</span>
+            </button>
+          </div>
+        </div>
       </div>
 
       {/* Confirmation Modal */}
@@ -344,6 +417,92 @@ export const AdminSettingsView: React.FC<AdminSettingsViewProps> = ({
                 <button
                   type="button"
                   onClick={handleCloseModal}
+                  className="w-full py-2.5 px-4 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs shadow-md shadow-blue-500/20 cursor-pointer"
+                >
+                  Done
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* QA Purge Modal */}
+      {showQaPurgeModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-sm animate-fade-in">
+          <div className="w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl border border-slate-100">
+            {qaPurgeCount === null ? (
+              <div>
+                <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+                  <div className="flex items-center space-x-2 text-amber-600">
+                    <AlertTriangle className="h-5 w-5" />
+                    <h3 className="text-base font-extrabold text-slate-900">
+                      Purge QA Test Records
+                    </h3>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleCloseQaModal}
+                    className="text-slate-400 hover:text-slate-600 cursor-pointer"
+                  >
+                    <X className="h-5 w-5" />
+                  </button>
+                </div>
+
+                <div className="mt-4 space-y-3">
+                  <p className="text-xs text-slate-600 leading-relaxed">
+                    This will delete all test items with code or name starting with <b className="text-amber-700 font-mono">QA_*</b>. Real products will not be affected.
+                  </p>
+
+                  {qaPurgeError && (
+                    <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-xs text-rose-700 font-semibold">
+                      {qaPurgeError}
+                    </div>
+                  )}
+                </div>
+
+                <div className="mt-6 flex items-center justify-end space-x-3">
+                  <button
+                    type="button"
+                    onClick={handleCloseQaModal}
+                    className="px-4 py-2 text-xs font-bold text-slate-600 hover:text-slate-800 cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    disabled={isPurgingQa}
+                    onClick={handleExecuteQaPurge}
+                    className="inline-flex items-center space-x-1.5 px-4 py-2 rounded-xl text-xs font-bold bg-amber-600 hover:bg-amber-700 text-white shadow-md shadow-amber-500/20 cursor-pointer active:scale-[0.98]"
+                  >
+                    {isPurgingQa ? (
+                      <>
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        <span>Purging QA Items...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Trash2 className="h-3.5 w-3.5" />
+                        <span>Confirm Purge QA</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="text-center py-4">
+                <div className="h-14 w-14 mx-auto rounded-2xl bg-emerald-50 border border-emerald-200 flex items-center justify-center text-emerald-600 mb-3">
+                  <CheckCircle2 className="h-8 w-8" />
+                </div>
+                <h3 className="text-lg font-bold text-slate-900">
+                  QA Records Purged!
+                </h3>
+                <p className="text-xs text-slate-500 mt-1 mb-5">
+                  Successfully removed {qaPurgeCount} QA test product(s). Your genuine hardware catalog is clean and ready.
+                </p>
+                <button
+                  type="button"
+                  onClick={handleCloseQaModal}
                   className="w-full py-2.5 px-4 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs shadow-md shadow-blue-500/20 cursor-pointer"
                 >
                   Done

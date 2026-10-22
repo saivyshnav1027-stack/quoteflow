@@ -171,8 +171,34 @@ export default async function handler(req, res) {
     }
   }
 
-  if (method === 'DELETE') {
+  if (method === 'DELETE' || (method === 'POST' && (req.query?.action === 'purge-qa' || req.body?.action === 'purge-qa'))) {
     try {
+      if (req.query?.action === 'purge-qa' || req.body?.action === 'purge-qa') {
+        const countRes = await db.execute(`
+          SELECT COUNT(*) as count FROM products WHERE product_code LIKE 'QA_%' OR product_name LIKE 'QA_%'
+        `)
+        const count = Number(countRes.rows[0].count)
+
+        await db.execute(`
+          DELETE FROM hero_product_children 
+          WHERE child_product_id IN (SELECT id FROM products WHERE product_code LIKE 'QA_%' OR product_name LIKE 'QA_%')
+        `)
+        await db.execute(`
+          DELETE FROM quotation_items 
+          WHERE product_id IN (SELECT id FROM products WHERE product_code LIKE 'QA_%' OR product_name LIKE 'QA_%')
+        `)
+        await db.execute(`
+          DELETE FROM products 
+          WHERE product_code LIKE 'QA_%' OR product_name LIKE 'QA_%'
+        `)
+
+        return res.status(200).json({
+          success: true,
+          message: `Successfully purged ${count} QA test products`,
+          deletedCount: count,
+        })
+      }
+
       const id = Number(req.query.id || req.body?.id)
       if (!id) {
         return res.status(400).json({ success: false, message: 'Invalid product ID' })

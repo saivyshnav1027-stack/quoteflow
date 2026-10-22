@@ -1,0 +1,51 @@
+Product Code,Product Name,Unit,List Price,Trade Discount %,Cost Price,Margin %,Net Price
+ASH-CPVC-075,QA_UPDATE_Ashirwad 3/4" CPVC PIPE SDR 13.5 (Updated Cost),pcs,500.00,52.00,240.00,16.00,278.40
+ASH-CPVC-100,QA_UPDATE_Ashirwad 1" CPVC PIPE SDR 13.5 (Updated Dis),pieces,700.00,55.00,315.00,15.00,362.25
+LD-320,QA_UPDATE_LD 3*20 (28 de) Premium Pipe,kgs,70.00,0.00,62.00,18.00,73.16
+SINK-1822,QA_UPDATE_18*22 Steel Sink Heavy Gauge,nos,1100.00,10.00,990.00,15.00,1138.50
+NPVC-ELB-63,QA_UPDATE_Nandi 63MM Pvc Elbow (H) Class 3,pcs,45.00,30.00,31.50,20.00,37.80
+WC-09,QA_UPDATE_9" Waste Coupling Brass Thread,no.,135.00,0.00,105.00,15.00,120.75
+FRP-2424,QA_UPDATE_24*24 FRP Inspection Chamber Cover,each,1350.00,0.00,1050.00,18.00,1239.00
+ASH-SWR-P75,QA_UPDATE_Ashirwad 75MM SWR Ringfit Pipe 3m,mtr,580.00,48.00,245.00,16.00,284.20
+NANDI-YEL,QA_UPDATE_Yellow Tubing Nandi Flex Heavy,kgs,140.00,0.00,122.00,15.00,140.30
+NC-75,QA_UPDATE_75mm Necko Clamps Galvanized,unit,35.00,0.00,26.00,20.00,31.20
+QA_VALVE_01,QA_Brass Concealed Stop Cock 15mm,pcs,450.00,35.00,292.50,18.00,345.15
+QA_VALVE_02,QA_Heavy Brass Angle Valve 1/2",pieces,280.00,30.00,196.00,20.00,235.20
+QA_VALVE_03,QA_CPVC Ball Valve 3/4" Astral,pcs,195.00,40.00,117.00,15.00,134.55
+QA_VALVE_04,QA_CPVC Ball Valve 1" Astral,nos,290.00,40.00,174.00,15.00,200.10
+QA_VALVE_05,QA_PVC Ball Valve 2" Long Handle,pcs,380.00,45.00,209.00,18.00,246.62
+QA_FTG_01,QA_CPVC Brass Elbow 3/4" x 1/2",pcs,95.00,42.00,55.10,20.00,66.12
+QA_FTG_02,QA_CPVC Brass Tee 3/4" x 1/2",pieces,125.00,42.00,72.50,20.00,87.00
+QA_FTG_03,QA_CPVC Coupler 3/4" SDR 11,pcs,32.00,45.00,17.60,25.00,22.00
+QA_FTG_04,QA_CPVC Coupler 1" SDR 11,no.,48.00,45.00,26.40,25.00,33.00
+QA_FTG_05,QA_CPVC Reducer 1" x 3/4",pcs,42.00,45.00,23.10,22.00,28.18
+QA_FTG_06,QA_CPVC Tank Nipple 1" Heavy,pcs,110.00,40.00,66.00,20.00,79.20
+QA_FTG_07,QA_CPVC Union 3/4" with O-Ring,each,145.00,40.00,87.00,18.00,102.66
+QA_FTG_08,QA_CPVC Union 1" with O-Ring,pcs,210.00,40.00,126.00,18.00,148.68
+QA_CHEM_01,QA_Finolex Solvent Cement 50ml,pcs,45.00,25.00,33.75,20.00,40.50
+QA_CHEM_02,QA_Finolex Solvent Cement 100ml,nos,85.00,28.00,61.20,20.00,73.44
+QA_CHEM_03,QA_Finolex Solvent Cement 250ml Tin,pieces,190.00,30.00,133.00,18.00,156.94
+QA_CHEM_04,QA_Finolex Solvent Cement 500ml Tin,pcs,340.00,32.00,231.20,18.00,272.82
+QA_CHEM_05,QA_Holdtite Thread Sealant 50g,pcs,38.00,20.00,30.40,25.00,38.00
+QA_CHEM_06,QA_M-Seal General Purpose 100g,pcs,30.00,15.00,25.50,20.00,30.60
+QA_PIPE_01,QA_Garden Braided Hose Pipe 1/2" 30m,roll,1250.00,20.00,1000.00,15.00,1150.00
+QA_PIPE_02,QA_Garden Braided Hose Pipe 3/4" 30m,rolls,1850.00,20.00,1480.00,15.00,1702.00
+QA_PIPE_03,QA_Suction Hose Pipe 2" Green,mtr,180.00,15.00,153.00,18.00,180.54
+QA_PIPE_04,QA_Suction Hose Pipe 2.5" Green,meters,240.00,15.00,204.00,18.00,240.72
+QA_PIPE_05,QA_Column Pipe 1.25" V4 Bell End (3m),pcs,680.00,35.00,442.00,16.00,512.72
+QA_ELEC_01,QA_Submersible Flat Cable 3x2.5 Sq mm,mtrs,95.00,15.00,80.75,15.00,92.86
+QA_ELEC_02,QA_Submersible Flat Cable 3x4.0 Sq mm,mtr,145.00,15.00,123.25,15.00,141.74
+QA_ELEC_03,QA_Finolex 1.5 Sq mm Wire Red 90m,bundle,1850.00,22.00,1443.00,14.00,1645.02
+QA_HARD_01,QA_Stainless Steel Screws 1.5" (100 Nos),set,120.00,25.00,90.00,25.00,112.50
+QA_HARD_02,QA_Rawl Plugs 35mm Plastic (100 Pcs),sets,60.00,30.00,42.00,30.00,54.60
+QA_HARD_03,QA_Teflon Tape 12mm x 10m Box (10 pcs),pair,150.00,30.00,105.00,25.00,131.25
+QA_HARD_04,QA_Hacksaw Blades Bimetal 12" (Pack of 10),kit,180.00,25.00,135.00,20.00,162.00
+QA_HARD_05,QA_GI Wire 18 Gauge Heavy,kgs,110.00,10.00,99.00,18.00,116.82
+QA_HARD_06,QA_Nylon Thread Line White 100m,roll,45.00,20.00,36.00,25.00,45.00
+QA_HARD_07,QA_Water Meter 15mm Magnetic Drive,pcs,950.00,20.00,760.00,15.00,874.00
+QA_HARD_08,QA_Cast Iron Foot Valve 2" Flanged,pcs,550.00,25.00,412.50,18.00,486.75
+,QA_NEW_AUTO_SKU_Brass Hex Nipple 1/2",pcs,45.00,20.00,36.00,20.00,43.20
+,QA_NEW_AUTO_SKU_Brass Bushing 3/4" x 1/2",pieces,55.00,20.00,44.00,20.00,52.80
+,QA_NEW_AUTO_SKU_PVC End Cap 2" Schedule 40,nos,35.00,30.00,24.50,25.00,30.63
+,QA_NEW_AUTO_SKU_CPVC End Plug 3/4" Threaded,pcs,28.00,35.00,18.20,25.00,22.75
+,QA_NEW_AUTO_SKU_Overhead Tank Filter Ball 1",each,120.00,25.00,90.00,20.00,108.00

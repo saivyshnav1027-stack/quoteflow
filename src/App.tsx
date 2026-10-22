@@ -1293,6 +1293,10 @@ function App() {
                 setEstimateRows([])
                 addToast('info', 'Database purged. All catalogs and records reset to pristine state.')
               }}
+              onPurgeQa={async () => {
+                await loadProducts()
+                addToast('info', 'All QA test products purged successfully.')
+              }}
             />
           )}
         </main>

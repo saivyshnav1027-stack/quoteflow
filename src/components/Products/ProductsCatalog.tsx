@@ -1,9 +1,22 @@
-import React, { useState } from 'react'
-import { Plus, Pencil, Trash2, Sparkles, UploadCloud, Download, FileSpreadsheet } from 'lucide-react'
+import React, { useState, useMemo } from 'react'
+import {
+  Plus,
+  Pencil,
+  Trash2,
+  Sparkles,
+  UploadCloud,
+  Download,
+  FileSpreadsheet,
+  History,
+  AlertTriangle,
+  Loader2,
+  X,
+} from 'lucide-react'
 import type { Product, PricingSuperiorityMode } from '../../types'
 import { formatINR } from '../../lib/pricing'
 import { downloadCatalogTemplate, exportCatalogToExcel } from '../../lib/excelTemplate'
 import { BulkUploadModal } from './BulkUploadModal'
+import { UploadHistoryModal } from './UploadHistoryModal'
 
 export interface ProductsCatalogProps {
   products: Product[]
@@ -30,13 +43,58 @@ export const ProductsCatalog: React.FC<ProductsCatalogProps> = ({
 }) => {
   const [search, setSearch] = useState('')
   const [showBulkUploadModal, setShowBulkUploadModal] = useState(false)
+  const [showHistoryModal, setShowHistoryModal] = useState(false)
+  const [catalogFilter, setCatalogFilter] = useState<'all' | 'stock' | 'qa'>('all')
+  const [showPurgeQaModal, setShowPurgeQaModal] = useState(false)
+  const [isPurgingQa, setIsPurgingQa] = useState(false)
 
-  const filteredProducts = products.filter(
-    (p) =>
-      p.product_name.toLowerCase().includes(search.toLowerCase()) ||
-      p.product_code.toLowerCase().includes(search.toLowerCase()) ||
-      p.unit.toLowerCase().includes(search.toLowerCase())
+  // Categorize QA test products vs Authentic stock
+  const qaProducts = useMemo(
+    () => products.filter((p) => p.product_code.startsWith('QA_') || p.product_name.startsWith('QA_')),
+    [products]
   )
+
+  const stockProducts = useMemo(
+    () => products.filter((p) => !p.product_code.startsWith('QA_') && !p.product_name.startsWith('QA_')),
+    [products]
+  )
+
+  const filteredProducts = useMemo(() => {
+    return products.filter((p) => {
+      const isQa = p.product_code.startsWith('QA_') || p.product_name.startsWith('QA_')
+      if (catalogFilter === 'stock' && isQa) return false
+      if (catalogFilter === 'qa' && !isQa) return false
+
+      const s = search.toLowerCase()
+      return (
+        p.product_name.toLowerCase().includes(s) ||
+        p.product_code.toLowerCase().includes(s) ||
+        p.unit.toLowerCase().includes(s)
+      )
+    })
+  }, [products, search, catalogFilter])
+
+  const handleExecutePurgeQa = async () => {
+    setIsPurgingQa(true)
+    try {
+      const res = await fetch('/api/products?action=purge-qa', {
+        method: 'DELETE',
+      })
+      if (res.ok) {
+        setShowPurgeQaModal(false)
+        if (onRefreshProducts) {
+          await onRefreshProducts()
+        }
+      } else {
+        alert('Failed to purge QA test records.')
+      }
+    } catch (e) {
+      console.error(e)
+      alert('Error during QA purge.')
+    } finally {
+      setIsPurgingQa(false)
+    }
+  }
 
   return (
     <div className="space-y-6">
@@ -48,6 +106,16 @@ export const ProductsCatalog: React.FC<ProductsCatalogProps> = ({
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2.5">
+          <button
+            type="button"
+            onClick={() => setShowHistoryModal(true)}
+            className="flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50 transition-colors shadow-sm cursor-pointer"
+            title="View upload history audit trail and re-download imported snapshots"
+          >
+            <History className="h-3.5 w-3.5 text-indigo-600" />
+            <span>Upload History</span>
+          </button>
+
           <button
             type="button"
             onClick={() => downloadCatalogTemplate()}
@@ -90,7 +158,8 @@ export const ProductsCatalog: React.FC<ProductsCatalogProps> = ({
       </div>
 
       <div className="rounded-2xl bg-white p-5 shadow-sm border border-slate-200/80">
-        <div className="mb-4">
+        {/* Search Bar & Filter Tabs */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
           <input
             type="text"
             placeholder="Filter products by code, name, or unit..."
@@ -98,6 +167,56 @@ export const ProductsCatalog: React.FC<ProductsCatalogProps> = ({
             onChange={(e) => setSearch(e.target.value)}
             className="w-full max-w-md rounded-xl border border-slate-200 bg-slate-50 px-4 py-2 text-sm outline-none focus:border-blue-500 focus:bg-white"
           />
+
+          <div className="flex items-center space-x-2">
+            <div className="inline-flex rounded-xl bg-slate-100 p-0.5 text-xs font-bold">
+              <button
+                type="button"
+                onClick={() => setCatalogFilter('all')}
+                className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
+                  catalogFilter === 'all'
+                    ? 'bg-white text-slate-900 shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                All ({products.length})
+              </button>
+              <button
+                type="button"
+                onClick={() => setCatalogFilter('stock')}
+                className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
+                  catalogFilter === 'stock'
+                    ? 'bg-white text-emerald-800 shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                Stock ({stockProducts.length})
+              </button>
+              <button
+                type="button"
+                onClick={() => setCatalogFilter('qa')}
+                className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
+                  catalogFilter === 'qa'
+                    ? 'bg-white text-rose-700 shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                QA Test ({qaProducts.length})
+              </button>
+            </div>
+
+            {qaProducts.length > 0 && (
+              <button
+                type="button"
+                onClick={() => setShowPurgeQaModal(true)}
+                className="inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-700 text-xs font-bold transition-all cursor-pointer"
+                title="Delete all QA test products with QA_* codes"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+                <span>Purge QA ({qaProducts.length})</span>
+              </button>
+            )}
+          </div>
         </div>
 
         <div className="overflow-x-auto rounded-xl border border-slate-200">
@@ -232,6 +351,71 @@ export const ProductsCatalog: React.FC<ProductsCatalogProps> = ({
           }
         }}
       />
+
+      <UploadHistoryModal
+        isOpen={showHistoryModal}
+        onClose={() => setShowHistoryModal(false)}
+      />
+
+      {/* Confirmation Modal for QA Test Records Purge */}
+      {showPurgeQaModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-sm animate-fade-in">
+          <div className="w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl border border-slate-100">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div className="flex items-center space-x-2 text-rose-600">
+                <AlertTriangle className="h-5 w-5" />
+                <h3 className="text-base font-extrabold text-slate-900">
+                  Purge QA Test Records
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowPurgeQaModal(false)}
+                className="text-slate-400 hover:text-slate-600 cursor-pointer"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="mt-4 space-y-3">
+              <p className="text-xs text-slate-600 leading-relaxed">
+                Found <span className="font-extrabold text-slate-900">{qaProducts.length}</span> test products matching <code className="bg-slate-100 px-1.5 py-0.5 rounded text-rose-700 font-mono font-bold">QA_*</code>.
+              </p>
+              <p className="text-xs text-slate-500">
+                This will safely delete all test items without affecting your authentic stock catalog ({stockProducts.length} items).
+              </p>
+            </div>
+
+            <div className="mt-6 flex items-center justify-end space-x-3">
+              <button
+                type="button"
+                onClick={() => setShowPurgeQaModal(false)}
+                className="px-4 py-2 text-xs font-bold text-slate-600 hover:text-slate-800 cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={isPurgingQa}
+                onClick={handleExecutePurgeQa}
+                className="inline-flex items-center space-x-1.5 px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold shadow-md shadow-rose-500/20 cursor-pointer active:scale-[0.98] transition-all disabled:opacity-60"
+              >
+                {isPurgingQa ? (
+                  <>
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    <span>Deleting QA Items...</span>
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="h-3.5 w-3.5" />
+                    <span>Purge {qaProducts.length} QA Products</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

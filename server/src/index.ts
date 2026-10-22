@@ -415,6 +415,115 @@ app.delete(['/api/products/:id', '/products/:id'], async (req, res) => {
   }
 })
 
+// Purge QA Records Route
+app.delete(['/api/products', '/products', '/api/products/purge-qa', '/products/purge-qa'], async (req, res) => {
+  try {
+    if (req.query?.action === 'purge-qa' || req.path.includes('purge-qa')) {
+      const countRes = await db.execute(`
+        SELECT COUNT(*) as count FROM products WHERE product_code LIKE 'QA_%' OR product_name LIKE 'QA_%'
+      `)
+      const count = Number(countRes.rows[0].count)
+
+      await db.execute(`
+        DELETE FROM hero_product_children 
+        WHERE child_product_id IN (SELECT id FROM products WHERE product_code LIKE 'QA_%' OR product_name LIKE 'QA_%')
+      `)
+      await db.execute(`
+        DELETE FROM quotation_items 
+        WHERE product_id IN (SELECT id FROM products WHERE product_code LIKE 'QA_%' OR product_name LIKE 'QA_%')
+      `)
+      await db.execute(`
+        DELETE FROM products 
+        WHERE product_code LIKE 'QA_%' OR product_name LIKE 'QA_%'
+      `)
+
+      return res.json({
+        success: true,
+        message: `Successfully purged ${count} QA test products`,
+        deletedCount: count,
+      })
+    }
+    return res.status(400).json({ success: false, message: 'Invalid delete action' })
+  } catch (error) {
+    console.error('Purge QA error:', error)
+    return res.status(500).json({ success: false, message: 'Failed to purge QA products' })
+  }
+})
+
+// =====================================================
+// CATALOG IMPORTS AUDIT TRAIL
+// =====================================================
+app.get(['/api/catalog-imports', '/catalog-imports'], async (_req, res) => {
+  try {
+    await db.execute(`
+      CREATE TABLE IF NOT EXISTS catalog_imports (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        filename TEXT NOT NULL,
+        file_size_kb REAL NOT NULL DEFAULT 0.0,
+        total_rows INTEGER NOT NULL DEFAULT 0,
+        new_count INTEGER NOT NULL DEFAULT 0,
+        update_count INTEGER NOT NULL DEFAULT 0,
+        pricing_mode TEXT NOT NULL DEFAULT 'MODE_A',
+        snapshot_json TEXT,
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+      )
+    `)
+    const result = await db.execute(`
+      SELECT id, filename, file_size_kb, total_rows, new_count, update_count, pricing_mode, snapshot_json, created_at
+      FROM catalog_imports
+      ORDER BY id DESC
+      LIMIT 50
+    `)
+    res.json(result.rows)
+  } catch (error) {
+    console.error('Fetch catalog imports error:', error)
+    res.status(500).json({ success: false, message: 'Failed to fetch catalog imports' })
+  }
+})
+
+app.post(['/api/catalog-imports', '/catalog-imports'], async (req, res) => {
+  try {
+    await db.execute(`
+      CREATE TABLE IF NOT EXISTS catalog_imports (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        filename TEXT NOT NULL,
+        file_size_kb REAL NOT NULL DEFAULT 0.0,
+        total_rows INTEGER NOT NULL DEFAULT 0,
+        new_count INTEGER NOT NULL DEFAULT 0,
+        update_count INTEGER NOT NULL DEFAULT 0,
+        pricing_mode TEXT NOT NULL DEFAULT 'MODE_A',
+        snapshot_json TEXT,
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+      )
+    `)
+    const body = req.body || {}
+    const filename = String(body.filename || 'import.csv').trim()
+    const fileSizeKb = Number(body.fileSizeKb || 0)
+    const totalRows = Number(body.totalRows || 0)
+    const newCount = Number(body.newCount || 0)
+    const updateCount = Number(body.updateCount || 0)
+    const pricingMode = String(body.pricingMode || 'MODE_A')
+    const snapshotJson = body.snapshotJson ? (typeof body.snapshotJson === 'string' ? body.snapshotJson : JSON.stringify(body.snapshotJson)) : ''
+
+    const result = await db.execute({
+      sql: `
+        INSERT INTO catalog_imports (filename, file_size_kb, total_rows, new_count, update_count, pricing_mode, snapshot_json)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+      `,
+      args: [filename, fileSizeKb, totalRows, newCount, updateCount, pricingMode, snapshotJson],
+    })
+
+    res.status(201).json({
+      success: true,
+      id: Number(result.lastInsertRowid),
+      message: 'Catalog import logged successfully',
+    })
+  } catch (error) {
+    console.error('Create catalog import error:', error)
+    res.status(500).json({ success: false, message: 'Failed to log catalog import' })
+  }
+})
+
 // =====================================================
 // 4.5. HERO PRODUCTS & CHILD COMPONENTS
 // =====================================================

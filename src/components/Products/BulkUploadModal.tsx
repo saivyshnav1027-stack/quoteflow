@@ -211,6 +211,25 @@ export const BulkUploadModal: React.FC<BulkUploadModalProps> = ({
       }
 
       setIsComplete(true)
+
+      // Record in Catalog Imports audit log
+      try {
+        await fetch('/api/catalog-imports', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            filename: fileName || 'supplier_catalog.xlsx',
+            totalRows: validRows.length,
+            newCount,
+            updateCount,
+            pricingMode: calculationMode,
+            snapshotJson: validRows,
+          }),
+        })
+      } catch (logErr) {
+        console.warn('Failed to record audit trail:', logErr)
+      }
+
       await onSuccess()
     } catch (err: any) {
       console.error('Bulk import error:', err)
