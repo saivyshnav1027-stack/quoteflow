@@ -1,68 +1,26 @@
 import { describe, it, expect } from 'vitest'
-import type { EstimateRow, HeroProductChild } from '../types'
+import type { EstimateRow, HeroProductChild, HeroProductWithChildren, Product } from '../types'
+import {
+  shouldUpdateProductListPriceInDb,
+  getPendingDbPriceUpdates,
+  formatPriceChangeWarningMessage,
+  checkCircularReference,
+  canProductBeChild,
+  isChildLinkEnabled,
+  getEligibleCartHeroProducts,
+} from './heroProduct'
 
-/**
- * Pure helper verifying whether an estimate row qualifies for updating the database List Price
- */
-export function shouldUpdateProductListPriceInDb(row: EstimateRow): boolean {
-  if (!row.productId) return false
-  if (!row.updateListPriceInDb) return false
-  const currentList = Number(row.listPrice || 0)
-  const origList = Number(row.originalListPrice ?? currentList)
-  if (currentList <= 0) return false
-  return currentList !== origList
+// Re-export helpers for backward-compatibility with tests
+export {
+  shouldUpdateProductListPriceInDb,
+  getPendingDbPriceUpdates,
+  formatPriceChangeWarningMessage,
+  checkCircularReference,
+  canProductBeChild,
+  isChildLinkEnabled,
+  getEligibleCartHeroProducts,
 }
 
-/**
- * Pure helper detecting whether saving an estimate requires the explicit confirmation modal
- */
-export function getPendingDbPriceUpdates(rows: EstimateRow[]): EstimateRow[] {
-  return rows.filter(shouldUpdateProductListPriceInDb)
-}
-
-/**
- * Pure helper formatting the explicit permanent price change confirmation warning
- */
-export function formatPriceChangeWarningMessage(rowsToUpdate: EstimateRow[]): string {
-  const isSingle = rowsToUpdate.length === 1
-  const itemDescription = isSingle
-    ? `1 item (e.g. ${rowsToUpdate[0].description}: ₹${Number(rowsToUpdate[0].originalListPrice ?? rowsToUpdate[0].listPrice).toFixed(2)} → ₹${Number(rowsToUpdate[0].listPrice).toFixed(2)})`
-    : `${rowsToUpdate.length} items:\n\n` +
-      rowsToUpdate
-        .map(
-          (r) =>
-            `• ${r.description}: ₹${Number(r.originalListPrice ?? r.listPrice).toFixed(2)} → ₹${Number(r.listPrice).toFixed(2)}`
-        )
-        .join('\n')
-
-  return `⚠️ Permanent Price Change: You are about to update the master catalog price for ${itemDescription}. This will affect all future quotes. Do you want to proceed?`
-}
-
-/**
- * Pure helper checking for circular dependency when linking child to hero product
- */
-export function checkCircularReference(
-  heroId: number,
-  childProductId: number,
-  existingRelationships: { hero_product_id: number; child_product_id: number }[]
-): { isCircular: boolean; error?: string } {
-  if (heroId === childProductId) {
-    return { isCircular: true, error: 'A Hero Product cannot be added as its own child component.' }
-  }
-
-  // Check direct reverse relationship (child is already hero of parent)
-  const directReverse = existingRelationships.some(
-    (r) => r.hero_product_id === childProductId && r.child_product_id === heroId
-  )
-  if (directReverse) {
-    return {
-      isCircular: true,
-      error: 'Circular reference detected: this child product is already a Hero parent of the selected product.',
-    }
-  }
-
-  return { isCircular: false }
-}
 
 describe('Enhancement 1: Selective List Price Updates to Database', () => {
   it('returns true when row is catalog product, updateListPriceInDb is true, and price actually changed', () => {
@@ -501,4 +459,240 @@ describe('Review & Validation: Edge Cases & State Isolation', () => {
     expect(warning).toContain('This will affect all future quotes. Do you want to proceed?')
   })
 })
+
+describe('Enhancement: Hero as Child Constraint & Estimator Gating', () => {
+  it('disallows adding a Hero Product as a child component', () => {
+    const heroProduct: Product = {
+      id: 1,
+      product_code: 'PUMP-5HP',
+      product_name: 'Crompton 5HP Submersible Pump',
+      unit: 'Sets',
+      list_price: 25000,
+      discount_percentage: 10,
+      cost_price: 22000,
+      margin_percentage: 15,
+      stock_quantity: 10,
+      is_hero: true,
+    }
+
+    const check = canProductBeChild(heroProduct)
+    expect(check.allowed).toBe(false)
+    expect(check.reason).toContain('A Hero Product cannot be added as a child component')
+  })
+
+  it('allows adding a standard non-hero product as a child component', () => {
+    const standardProduct: Product = {
+      id: 2,
+      product_code: 'CBL-4SQ',
+      product_name: 'Flat Submersible Cable 4sqmm',
+      unit: 'Mtr.',
+      list_price: 100,
+      discount_percentage: 20,
+      cost_price: 72,
+      margin_percentage: 15,
+      stock_quantity: 500,
+      is_hero: false,
+    }
+
+    const check = canProductBeChild(standardProduct)
+    expect(check.allowed).toBe(true)
+  })
+
+  it('disables child linking button when no hero products exist in the store', () => {
+    const check = isChildLinkEnabled(2, [], [])
+    expect(check.enabled).toBe(false)
+    expect(check.tooltip).toContain('No Hero Products configured yet')
+  })
+
+  it('disables child linking button when product is custom item with no catalog productId', () => {
+    const hero: HeroProductWithChildren = {
+      id: 1,
+      product_code: 'PUMP-5HP',
+      product_name: 'Pump',
+      unit: 'Sets',
+      list_price: 25000,
+      discount_percentage: 0,
+      cost_price: 22000,
+      margin_percentage: 15,
+      stock_quantity: 10,
+      is_hero: true,
+      children: [],
+    }
+
+    const check = isChildLinkEnabled(null, [hero], [])
+    expect(check.enabled).toBe(false)
+    expect(check.tooltip).toContain('Custom items not in catalog cannot be linked')
+  })
+
+  it('disables child linking button when target item is itself a Hero Product', () => {
+    const hero: HeroProductWithChildren = {
+      id: 1,
+      product_code: 'PUMP-5HP',
+      product_name: 'Pump',
+      unit: 'Sets',
+      list_price: 25000,
+      discount_percentage: 0,
+      cost_price: 22000,
+      margin_percentage: 15,
+      stock_quantity: 10,
+      is_hero: true,
+      children: [],
+    }
+
+    const check = isChildLinkEnabled(1, [hero], [hero])
+    expect(check.enabled).toBe(false)
+    expect(check.tooltip).toContain('A Hero Product cannot be linked as a child component')
+  })
+
+  it('enables child linking button for a standard item when hero products exist', () => {
+    const hero: HeroProductWithChildren = {
+      id: 1,
+      product_code: 'PUMP-5HP',
+      product_name: 'Pump',
+      unit: 'Sets',
+      list_price: 25000,
+      discount_percentage: 0,
+      cost_price: 22000,
+      margin_percentage: 15,
+      stock_quantity: 10,
+      is_hero: true,
+      children: [],
+    }
+
+    const childProd: Product = {
+      id: 2,
+      product_code: 'CBL-4SQ',
+      product_name: 'Cable',
+      unit: 'Mtr.',
+      list_price: 100,
+      discount_percentage: 0,
+      cost_price: 72,
+      margin_percentage: 15,
+      stock_quantity: 100,
+      is_hero: false,
+    }
+
+    const check = isChildLinkEnabled(2, [hero], [hero, childProd])
+    expect(check.enabled).toBe(true)
+    expect(check.tooltip).toContain('Add as Child Component to a Hero Product bundle')
+  })
+})
+
+describe('Enhancement: Handling Two Hero Products in the Active Cart', () => {
+  const hero1: HeroProductWithChildren = {
+    id: 10,
+    product_code: 'PUMP-CRM-5HP',
+    product_name: 'Crompton 5HP Submersible Pump',
+    unit: 'Sets',
+    list_price: 25000,
+    discount_percentage: 0,
+    cost_price: 22000,
+    margin_percentage: 15,
+    stock_quantity: 5,
+    is_hero: true,
+    children: [],
+  }
+
+  const hero2: HeroProductWithChildren = {
+    id: 20,
+    product_code: 'PUMP-KIR-3HP',
+    product_name: 'Kirloskar 3HP Openwell Pump',
+    unit: 'Sets',
+    list_price: 18000,
+    discount_percentage: 0,
+    cost_price: 15000,
+    margin_percentage: 15,
+    stock_quantity: 8,
+    is_hero: true,
+    children: [],
+  }
+
+  const allHeroes = [hero1, hero2]
+
+  it('correctly identifies both hero products when two hero products are in the cart', () => {
+    const cartRows: EstimateRow[] = [
+      {
+        id: 'r1',
+        productId: 10, // Hero 1
+        productCode: 'PUMP-CRM-5HP',
+        description: 'Crompton 5HP Submersible Pump',
+        checked: false,
+        quantity: 1,
+        unit: 'Sets',
+        listPrice: 25000,
+        discountPercentage: 0,
+        costPrice: 22000,
+        marginPercentage: 15,
+        discount: 0,
+        discountType: 'PERCENT',
+        price: 25300,
+        lineTotal: 25300,
+      },
+      {
+        id: 'r2',
+        productId: 20, // Hero 2
+        productCode: 'PUMP-KIR-3HP',
+        description: 'Kirloskar 3HP Openwell Pump',
+        checked: false,
+        quantity: 1,
+        unit: 'Sets',
+        listPrice: 18000,
+        discountPercentage: 0,
+        costPrice: 15000,
+        marginPercentage: 15,
+        discount: 0,
+        discountType: 'PERCENT',
+        price: 17250,
+        lineTotal: 17250,
+      },
+      {
+        id: 'r3',
+        productId: 30, // Regular child accessory
+        productCode: 'CBL-4SQ',
+        description: 'Submersible Cable',
+        checked: false,
+        quantity: 50,
+        unit: 'Mtr.',
+        listPrice: 100,
+        discountPercentage: 0,
+        costPrice: 72,
+        marginPercentage: 15,
+        discount: 0,
+        discountType: 'PERCENT',
+        price: 85,
+        lineTotal: 4250,
+      },
+    ]
+
+    const cartHeroes = getEligibleCartHeroProducts(cartRows, allHeroes, 30)
+    expect(cartHeroes.length).toBe(2)
+    expect(cartHeroes.map((h) => h.id)).toEqual([10, 20])
+  })
+
+  it('excludes target product itself if target product was also checked', () => {
+    const cartRows: EstimateRow[] = [
+      {
+        id: 'r1',
+        productId: 10,
+        productCode: 'PUMP-CRM-5HP',
+        description: 'Crompton 5HP Submersible Pump',
+        checked: false,
+        quantity: 1,
+        unit: 'Sets',
+        listPrice: 25000,
+        discountPercentage: 0,
+        costPrice: 22000,
+        marginPercentage: 15,
+        discount: 0,
+        discountType: 'PERCENT',
+        price: 25300,
+        lineTotal: 25300,
+      },
+    ]
+
+    const cartHeroes = getEligibleCartHeroProducts(cartRows, allHeroes, 10)
+    expect(cartHeroes.length).toBe(0) // Cannot link hero 10 to itself
+  })
+})
+
 

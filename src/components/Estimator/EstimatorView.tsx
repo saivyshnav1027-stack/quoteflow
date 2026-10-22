@@ -14,6 +14,7 @@ import {
 } from 'lucide-react'
 import type { Customer, Product, EstimateRow, HeroProductWithChildren, EstimatorSummary } from '../../types'
 import { formatINR } from '../../lib/pricing'
+import { isChildLinkEnabled } from '../../lib/heroProduct'
 import { AddChildToHeroModal } from './AddChildToHeroModal'
 
 export interface EstimatorViewProps {
@@ -635,16 +636,28 @@ export const EstimatorView: React.FC<EstimatorViewProps> = ({
                             </span>
                           </label>
                         )}
-                        {row.productId && onLinkChildToHero && (
-                          <button
-                            type="button"
-                            onClick={() => setAddChildModalTarget(row)}
-                            className="p-1 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors cursor-pointer"
-                            title="Add as Child Component to Hero Product"
-                          >
-                            <Layers className="h-4 w-4" />
-                          </button>
-                        )}
+                        {row.productId && onLinkChildToHero && (() => {
+                          const linkStatus = isChildLinkEnabled(row.productId, heroProducts, products)
+                          return (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (linkStatus.enabled) {
+                                  setAddChildModalTarget(row)
+                                }
+                              }}
+                              disabled={!linkStatus.enabled}
+                              className={`p-1 rounded transition-colors ${
+                                linkStatus.enabled
+                                  ? 'text-slate-400 hover:text-blue-600 hover:bg-blue-50 cursor-pointer'
+                                  : 'text-slate-200 cursor-not-allowed opacity-40'
+                              }`}
+                              title={linkStatus.tooltip}
+                            >
+                              <Layers className="h-4 w-4" />
+                            </button>
+                          )
+                        })()}
                         <button
                           onClick={() => onRemoveRow(row.id)}
                           className="p-1 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors cursor-pointer"
@@ -838,6 +851,7 @@ export const EstimatorView: React.FC<EstimatorViewProps> = ({
           targetRow={addChildModalTarget}
           heroProducts={heroProducts}
           allProducts={products}
+          cartRows={estimateRows}
           onLinkChild={onLinkChildToHero}
         />
       )}

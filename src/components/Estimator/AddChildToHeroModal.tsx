@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react'
-import { X, Layers, AlertCircle, Loader2, Check } from 'lucide-react'
+import React, { useState, useEffect, useMemo } from 'react'
+import { X, Layers, AlertCircle, Loader2, Check, Sparkles } from 'lucide-react'
 import type { EstimateRow, Product, HeroProductWithChildren } from '../../types'
+import { getEligibleCartHeroProducts, canProductBeChild } from '../../lib/heroProduct'
 
 export interface AddChildToHeroModalProps {
   isOpen: boolean
@@ -8,6 +9,7 @@ export interface AddChildToHeroModalProps {
   targetRow: EstimateRow | null
   heroProducts: HeroProductWithChildren[]
   allProducts: Product[]
+  cartRows?: EstimateRow[]
   onLinkChild: (heroProductId: number, childProductId: number, defaultQuantity: number) => Promise<boolean>
 }
 
@@ -17,6 +19,7 @@ export const AddChildToHeroModal: React.FC<AddChildToHeroModalProps> = ({
   targetRow,
   heroProducts,
   allProducts,
+  cartRows = [],
   onLinkChild,
 }) => {
   const [selectedHeroId, setSelectedHeroId] = useState<number | ''>('')
@@ -25,35 +28,56 @@ export const AddChildToHeroModal: React.FC<AddChildToHeroModalProps> = ({
   const [errorMessage, setErrorMessage] = useState('')
   const [successMessage, setSuccessMessage] = useState('')
 
-  // Eligible hero products: cannot link product to itself
-  const eligibleHeroProducts = heroProducts.filter(
-    (h) => targetRow && h.id !== targetRow.productId
-  )
+  // Check if target item is eligible to be a child (cannot be a Hero Product itself)
+  const targetProduct = targetRow?.productId
+    ? allProducts.find((p) => p.id === targetRow.productId)
+    : null
+  const childEligibility = targetProduct
+    ? canProductBeChild(targetProduct)
+    : { allowed: true }
 
-  // Non-hero products that could be promoted if no hero products exist
-  const potentialHeroProducts = allProducts.filter(
-    (p) => targetRow && p.id !== targetRow.productId
-  )
+  // Eligible hero products: exclude target product itself
+  const eligibleHeroProducts = useMemo(() => {
+    return heroProducts.filter((h) => targetRow && h.id !== targetRow.productId)
+  }, [heroProducts, targetRow])
+
+  // Heroes specifically present in the current cart
+  const cartHeroes = useMemo(() => {
+    return getEligibleCartHeroProducts(cartRows, eligibleHeroProducts, targetRow?.productId)
+  }, [cartRows, eligibleHeroProducts, targetRow])
+
+  // Other store heroes not in cart
+  const otherHeroes = useMemo(() => {
+    const cartHeroIds = new Set(cartHeroes.map((h) => h.id))
+    return eligibleHeroProducts.filter((h) => !cartHeroIds.has(h.id))
+  }, [eligibleHeroProducts, cartHeroes])
 
   useEffect(() => {
     if (isOpen && targetRow) {
       setDefaultQuantity(Math.max(0.01, targetRow.quantity || 1))
       setErrorMessage('')
       setSuccessMessage('')
-      if (eligibleHeroProducts.length > 0) {
+
+      // Prioritize the first hero product in the active cart, else fallback to first eligible hero
+      if (cartHeroes.length > 0) {
+        setSelectedHeroId(cartHeroes[0].id)
+      } else if (eligibleHeroProducts.length > 0) {
         setSelectedHeroId(eligibleHeroProducts[0].id)
-      } else if (potentialHeroProducts.length > 0) {
-        setSelectedHeroId(potentialHeroProducts[0].id)
       } else {
         setSelectedHeroId('')
       }
     }
-  }, [isOpen, targetRow])
+  }, [isOpen, targetRow, cartHeroes, eligibleHeroProducts])
 
   if (!isOpen || !targetRow) return null
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (!childEligibility.allowed) {
+      setErrorMessage(childEligibility.reason || 'This product cannot be linked as a child component.')
+      return
+    }
+
     if (!selectedHeroId) {
       setErrorMessage('Please select a Hero Product to link this component to.')
       return
@@ -106,6 +130,14 @@ export const AddChildToHeroModal: React.FC<AddChildToHeroModalProps> = ({
           </button>
         </div>
 
+        {/* Error message / Constraint violation */}
+        {!childEligibility.allowed && (
+          <div className="mt-3 flex items-start gap-2 rounded-xl bg-rose-50 border border-rose-200 p-3 text-xs text-rose-700">
+            <AlertCircle className="h-4 w-4 shrink-0 text-rose-600 mt-0.5" />
+            <span>{childEligibility.reason}</span>
+          </div>
+        )}
+
         {errorMessage && (
           <div className="mt-3 flex items-start gap-2 rounded-xl bg-rose-50 border border-rose-200 p-3 text-xs text-rose-700">
             <AlertCircle className="h-4 w-4 shrink-0 text-rose-600 mt-0.5" />
@@ -132,42 +164,57 @@ export const AddChildToHeroModal: React.FC<AddChildToHeroModalProps> = ({
             </div>
           </div>
 
-          {/* Select Hero Product */}
+          {/* Multiple Hero Products Notice & Selection */}
           <div>
-            <label className="block text-xs font-bold text-slate-700 mb-1">
-              Select Parent Hero Product
-            </label>
+            <div className="flex items-center justify-between mb-1">
+              <label className="block text-xs font-bold text-slate-700">
+                Select Parent Hero Product
+              </label>
+              {cartHeroes.length > 1 && (
+                <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 text-amber-900 px-2 py-0.5 text-[10px] font-extrabold">
+                  <Sparkles className="h-2.5 w-2.5" />
+                  {cartHeroes.length} Hero Products on Cart
+                </span>
+              )}
+            </div>
+
+            {cartHeroes.length > 1 && (
+              <p className="text-[11px] text-slate-500 mb-1.5">
+                Multiple hero products are currently in your cart. Choose which one this accessory should attach to:
+              </p>
+            )}
+
             {eligibleHeroProducts.length > 0 ? (
               <select
                 value={selectedHeroId}
                 onChange={(e) => setSelectedHeroId(Number(e.target.value))}
-                className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-900 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                disabled={!childEligibility.allowed}
+                className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-900 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 disabled:opacity-50"
               >
-                {eligibleHeroProducts.map((h) => (
-                  <option key={h.id} value={h.id}>
-                    ⭐ {h.product_name} ({h.children?.length || 0} existing child items)
-                  </option>
-                ))}
+                {cartHeroes.length > 0 && (
+                  <optgroup label="⭐ In Current Active Cart (Recommended)">
+                    {cartHeroes.map((h) => (
+                      <option key={h.id} value={h.id}>
+                        ⭐ {h.product_name} ({h.children?.length || 0} existing child items)
+                      </option>
+                    ))}
+                  </optgroup>
+                )}
+
+                {otherHeroes.length > 0 && (
+                  <optgroup label="Other Catalog Hero Products">
+                    {otherHeroes.map((h) => (
+                      <option key={h.id} value={h.id}>
+                        {h.product_name} ({h.children?.length || 0} existing child items)
+                      </option>
+                    ))}
+                  </optgroup>
+                )}
               </select>
-            ) : potentialHeroProducts.length > 0 ? (
-              <div>
-                <p className="text-[11px] text-amber-700 mb-1.5 font-medium">
-                  No products are currently marked as Hero Products. Select any product below to promote it as a Hero Product:
-                </p>
-                <select
-                  value={selectedHeroId}
-                  onChange={(e) => setSelectedHeroId(Number(e.target.value))}
-                  className="w-full rounded-xl border border-amber-300 bg-amber-50/50 px-3 py-2 text-xs font-semibold text-slate-900 outline-none focus:border-blue-500"
-                >
-                  {potentialHeroProducts.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.product_name} ({p.product_code})
-                    </option>
-                  ))}
-                </select>
-              </div>
             ) : (
-              <p className="text-xs text-slate-400">No available products found in catalog.</p>
+              <div className="rounded-xl bg-slate-50 border border-slate-200 p-3 text-xs text-slate-500">
+                No eligible Hero Products found in the catalog. Please mark a product as Hero first.
+              </div>
             )}
           </div>
 
@@ -182,10 +229,11 @@ export const AddChildToHeroModal: React.FC<AddChildToHeroModalProps> = ({
               min="0.01"
               value={defaultQuantity}
               onChange={(e) => setDefaultQuantity(Math.max(0.01, parseFloat(e.target.value) || 1))}
-              className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-900 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+              disabled={!childEligibility.allowed}
+              className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-900 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 disabled:opacity-50"
             />
             <span className="text-[11px] text-slate-400 mt-1 block">
-              When the Hero Product is selected in the Estimator, this item will auto-populate with this default quantity.
+              When the selected Hero Product is added to an estimate, this item will auto-populate with this default quantity.
             </span>
           </div>
 
@@ -201,7 +249,7 @@ export const AddChildToHeroModal: React.FC<AddChildToHeroModalProps> = ({
             </button>
             <button
               type="submit"
-              disabled={isSubmitting || !selectedHeroId}
+              disabled={isSubmitting || !selectedHeroId || !childEligibility.allowed}
               className="flex items-center justify-center gap-1.5 rounded-xl bg-blue-600 px-4 py-2 text-xs font-bold text-white hover:bg-blue-700 shadow-sm cursor-pointer disabled:opacity-50"
             >
               {isSubmitting && <Loader2 className="h-3.5 w-3.5 animate-spin" />}

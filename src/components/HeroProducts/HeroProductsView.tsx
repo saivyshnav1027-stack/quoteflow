@@ -114,10 +114,12 @@ export const HeroProductsView: React.FC<HeroProductsViewProps> = ({
     }
   }
 
-  // Available child products to add (exclude self and already added children)
+  // Available child products to add (exclude self, already added children, and other Hero Products)
   const availableChildren = allProducts.filter((p) => {
     if (!selectedHeroForAdd) return false
     if (p.id === selectedHeroForAdd.id) return false
+    // Constraint: A Hero Product cannot be added as a child of another Hero Product
+    if (Boolean(p.is_hero) || heroProducts.some((h) => h.id === p.id)) return false
     const alreadyChild = selectedHeroForAdd.children?.some((c) => c.child_product_id === p.id)
     if (alreadyChild) return false
     if (childProductSearch) {

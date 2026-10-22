@@ -181,11 +181,19 @@ export default async function handler(req, res) {
 
       // Check child exists
       const childCheck = await db.execute({
-        sql: `SELECT id, product_name FROM products WHERE id = ?`,
+        sql: `SELECT id, product_name, is_hero FROM products WHERE id = ?`,
         args: [childProductId],
       })
       if (childCheck.rows.length === 0) {
         return res.status(404).json({ success: false, message: 'Child product not found' })
+      }
+
+      // Constraint: A Hero Product cannot be added as a child of another Hero Product
+      if (Number(childCheck.rows[0].is_hero) === 1) {
+        return res.status(400).json({
+          success: false,
+          message: 'A Hero Product cannot be added as a child component of another Hero Product.',
+        })
       }
 
       // Check circular references
