@@ -39,12 +39,13 @@ export const HeroProductsView: React.FC<HeroProductsViewProps> = ({
   )
   const [searchFilter, setSearchFilter] = useState('')
 
-  // Add Child Modal inside HeroProductsView
+  // Add Child Modal inside HeroProductsView (supports multi-selection)
   const [showAddChildModal, setShowAddChildModal] = useState(false)
   const [selectedHeroForAdd, setSelectedHeroForAdd] = useState<HeroProductWithChildren | null>(null)
   const [childProductSearch, setChildProductSearch] = useState('')
-  const [selectedChildProduct, setSelectedChildProduct] = useState<Product | null>(null)
-  const [defaultQuantity, setDefaultQuantity] = useState<number>(1)
+  const [selectedChildMap, setSelectedChildMap] = useState<
+    Record<number, { product: Product; defaultQuantity: number }>
+  >({})
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [modalError, setModalError] = useState('')
 
@@ -64,17 +65,43 @@ export const HeroProductsView: React.FC<HeroProductsViewProps> = ({
 
   const handleOpenAddChild = (hero: HeroProductWithChildren) => {
     setSelectedHeroForAdd(hero)
-    setSelectedChildProduct(null)
+    setSelectedChildMap({})
     setChildProductSearch('')
-    setDefaultQuantity(1)
     setModalError('')
     setShowAddChildModal(true)
   }
 
+  const handleToggleSelectChild = (prod: Product) => {
+    setSelectedChildMap((prev) => {
+      const next = { ...prev }
+      if (next[prod.id]) {
+        delete next[prod.id]
+      } else {
+        next[prod.id] = { product: prod, defaultQuantity: 1 }
+      }
+      return next
+    })
+  }
+
+  const handleUpdateSelectedQuantity = (productId: number, qty: number) => {
+    setSelectedChildMap((prev) => {
+      if (!prev[productId]) return prev
+      return {
+        ...prev,
+        [productId]: {
+          ...prev[productId],
+          defaultQuantity: Math.max(0.01, qty),
+        },
+      }
+    })
+  }
+
   const handleSaveChild = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!selectedHeroForAdd || !selectedChildProduct) {
-      setModalError('Please choose a child product to add.')
+    if (!selectedHeroForAdd) return
+    const items = Object.values(selectedChildMap)
+    if (items.length === 0) {
+      setModalError('Please choose at least one child product to add.')
       return
     }
 
@@ -82,16 +109,20 @@ export const HeroProductsView: React.FC<HeroProductsViewProps> = ({
     setModalError('')
 
     try {
-      const ok = await onAddChild(
-        selectedHeroForAdd.id,
-        selectedChildProduct.id,
-        defaultQuantity
-      )
-      if (ok) {
+      let addedCount = 0
+      for (const item of items) {
+        const ok = await onAddChild(
+          selectedHeroForAdd.id,
+          item.product.id,
+          item.defaultQuantity
+        )
+        if (ok) addedCount++
+      }
+      if (addedCount > 0) {
         setShowAddChildModal(false)
       }
     } catch (err: any) {
-      setModalError(err?.message || 'Failed to add child component.')
+      setModalError(err?.message || 'Failed to add child component(s).')
     } finally {
       setIsSubmitting(false)
     }
@@ -444,71 +475,101 @@ export const HeroProductsView: React.FC<HeroProductsViewProps> = ({
             <form onSubmit={handleSaveChild} className="mt-4 space-y-4">
               {/* Search catalog */}
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">
-                  Search & Pick Child Item
-                </label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-xs font-bold text-slate-700">
+                    Search & Select Accessories ({availableChildren.length} available)
+                  </label>
+                  {Object.keys(selectedChildMap).length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setSelectedChildMap({})}
+                      className="text-[11px] font-bold text-rose-600 hover:text-rose-700 cursor-pointer"
+                    >
+                      Clear Selection ({Object.keys(selectedChildMap).length})
+                    </button>
+                  )}
+                </div>
                 <div className="relative mb-2">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
                   <input
                     type="text"
-                    placeholder="Search catalog products..."
+                    placeholder="Search catalog products (e.g., Cable, Clamp, Pipe)..."
                     value={childProductSearch}
                     onChange={(e) => setChildProductSearch(e.target.value)}
                     className="w-full rounded-xl border border-slate-200 bg-slate-50 pl-8 pr-3 py-2 text-xs text-slate-900 placeholder-slate-400 outline-none focus:border-blue-500 focus:bg-white"
                   />
                 </div>
 
-                <div className="max-h-48 overflow-y-auto rounded-xl border border-slate-200 divide-y divide-slate-100">
+                <div className="max-h-60 overflow-y-auto rounded-xl border border-slate-200 divide-y divide-slate-100">
                   {availableChildren.length === 0 ? (
                     <div className="p-4 text-center text-xs text-slate-400">
                       No matching unbundled products found
                     </div>
                   ) : (
                     availableChildren.map((p) => {
-                      const isChosen = selectedChildProduct?.id === p.id
+                      const isChosen = Boolean(selectedChildMap[p.id])
+                      const chosenQty = selectedChildMap[p.id]?.defaultQuantity ?? 1
+
                       return (
-                        <button
+                        <div
                           key={p.id}
-                          type="button"
-                          onClick={() => setSelectedChildProduct(p)}
-                          className={`flex w-full items-center justify-between p-2.5 text-left text-xs transition-colors cursor-pointer ${
-                            isChosen ? 'bg-blue-50 font-bold text-blue-900' : 'hover:bg-slate-50'
+                          className={`flex items-center justify-between p-2.5 text-xs transition-colors ${
+                            isChosen ? 'bg-blue-50/80 border-l-4 border-l-blue-600 font-semibold' : 'hover:bg-slate-50'
                           }`}
                         >
-                          <div>
-                            <span className="font-semibold text-slate-900">{p.product_name}</span>
-                            <span className="text-[11px] text-slate-400 ml-2">({p.product_code})</span>
-                          </div>
-                          <span className="text-slate-600">{p.unit} • {formatINR(p.cost_price)}</span>
-                        </button>
+                          <label className="flex items-center gap-2.5 flex-1 min-w-0 cursor-pointer select-none">
+                            <input
+                              type="checkbox"
+                              checked={isChosen}
+                              onChange={() => handleToggleSelectChild(p)}
+                              className="rounded border-slate-300 text-blue-600 focus:ring-0 cursor-pointer w-4 h-4"
+                            />
+                            <div className="truncate">
+                              <span className="font-bold text-slate-900">{p.product_name}</span>
+                              <span className="text-[11px] text-slate-400 ml-1.5 font-mono">({p.product_code})</span>
+                              <div className="text-[11px] text-slate-500">
+                                {p.unit} • Cost: {formatINR(p.cost_price)}
+                              </div>
+                            </div>
+                          </label>
+
+                          {isChosen && (
+                            <div className="flex items-center gap-1.5 ml-3 shrink-0">
+                              <span className="text-[10px] text-slate-500 font-bold uppercase">Qty:</span>
+                              <input
+                                type="number"
+                                step="any"
+                                min="0.01"
+                                value={chosenQty}
+                                onChange={(e) =>
+                                  handleUpdateSelectedQuantity(p.id, parseFloat(e.target.value) || 1)
+                                }
+                                className="w-16 rounded border border-blue-200 bg-white px-2 py-1 text-xs text-center font-bold text-blue-900 outline-none focus:border-blue-500"
+                              />
+                              <span className="text-[10px] text-slate-500 font-semibold w-8">{p.unit}</span>
+                            </div>
+                          )}
+                        </div>
                       )
                     })
                   )}
                 </div>
               </div>
 
-              {selectedChildProduct && (
-                <div className="rounded-xl bg-blue-50/70 border border-blue-200 p-3 text-xs">
-                  <span className="font-bold text-blue-900">Selected: </span>
-                  <span className="text-blue-800">{selectedChildProduct.product_name}</span>
-                  <span className="text-blue-600 ml-1">({selectedChildProduct.unit})</span>
+              {Object.keys(selectedChildMap).length > 0 && (
+                <div className="rounded-xl bg-blue-50/90 border border-blue-200 p-3 text-xs flex items-center justify-between">
+                  <div>
+                    <span className="font-extrabold text-blue-950">{Object.keys(selectedChildMap).length} component(s) selected:</span>
+                    <span className="text-blue-800 ml-1.5">
+                      {Object.values(selectedChildMap).map((it) => it.product.product_name).slice(0, 2).join(', ')}
+                      {Object.keys(selectedChildMap).length > 2 ? ` and ${Object.keys(selectedChildMap).length - 2} more` : ''}
+                    </span>
+                  </div>
+                  <span className="text-[11px] font-bold text-blue-700 bg-blue-100 px-2 py-0.5 rounded-full">
+                    Ready to link
+                  </span>
                 </div>
               )}
-
-              {/* Default Quantity */}
-              <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">
-                  Default Bundle Quantity {selectedChildProduct ? `(${selectedChildProduct.unit})` : ''}
-                </label>
-                <input
-                  type="number"
-                  step="any"
-                  min="0.01"
-                  value={defaultQuantity}
-                  onChange={(e) => setDefaultQuantity(Math.max(0.01, parseFloat(e.target.value) || 1))}
-                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-900 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
-                />
-              </div>
 
               <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
                 <button
@@ -521,11 +582,19 @@ export const HeroProductsView: React.FC<HeroProductsViewProps> = ({
                 </button>
                 <button
                   type="submit"
-                  disabled={isSubmitting || !selectedChildProduct}
+                  disabled={isSubmitting || Object.keys(selectedChildMap).length === 0}
                   className="flex items-center justify-center gap-1.5 rounded-xl bg-blue-600 px-4 py-2 text-xs font-bold text-white hover:bg-blue-700 shadow-sm cursor-pointer disabled:opacity-50"
                 >
                   {isSubmitting && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
-                  <span>{isSubmitting ? 'Adding...' : 'Add to Bundle'}</span>
+                  <span>
+                    {isSubmitting
+                      ? 'Adding Components...'
+                      : Object.keys(selectedChildMap).length > 1
+                      ? `Add All (${Object.keys(selectedChildMap).length}) Items to Bundle`
+                      : Object.keys(selectedChildMap).length === 1
+                      ? 'Add (1) Item to Bundle'
+                      : 'Select Items to Add'}
+                  </span>
                 </button>
               </div>
             </form>

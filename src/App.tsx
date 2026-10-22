@@ -165,9 +165,9 @@ function App() {
       const res = await fetch(`${API_BASE}/customers`)
       if (res.ok) {
         const data = await res.json()
-        if (Array.isArray(data) && data.length > 0) {
+        if (Array.isArray(data)) {
           setCustomers(data)
-          if (!selectedCustomer) {
+          if (data.length > 0 && (!selectedCustomer || !data.some(c => c.id === selectedCustomer.id))) {
             setSelectedCustomer(data[0])
           }
         }
@@ -182,7 +182,7 @@ function App() {
       const res = await fetch(`${API_BASE}/products`)
       if (res.ok) {
         const data = await res.json()
-        if (Array.isArray(data) && data.length > 0) {
+        if (Array.isArray(data)) {
           setProducts(data)
         }
       }
@@ -1238,6 +1238,7 @@ function App() {
               onEditProduct={(p) => setEditProduct(p)}
               onDeleteProduct={handleDeleteProduct}
               onToggleHero={handleToggleHeroProduct}
+              onRefreshProducts={loadProducts}
             />
           )}
 
@@ -1270,6 +1271,16 @@ function App() {
             <AdminSettingsView
               enableListPriceMode={enableListPriceMode}
               onToggleListPriceMode={toggleListPriceMode}
+              onCleanSlatePurge={async () => {
+                await Promise.all([
+                  loadProducts(),
+                  loadCustomers(),
+                  loadHeroProducts(),
+                  loadQuotations(),
+                ])
+                setEstimateRows([])
+                addToast('info', 'Database purged. All catalogs and records reset to pristine state.')
+              }}
             />
           )}
         </main>

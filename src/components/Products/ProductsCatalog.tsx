@@ -1,7 +1,9 @@
 import React, { useState } from 'react'
-import { Plus, Pencil, Trash2, Sparkles } from 'lucide-react'
+import { Plus, Pencil, Trash2, Sparkles, UploadCloud, Download, FileSpreadsheet } from 'lucide-react'
 import type { Product } from '../../types'
 import { formatINR } from '../../lib/pricing'
+import { downloadCatalogTemplate, exportCatalogToExcel } from '../../lib/excelTemplate'
+import { BulkUploadModal } from './BulkUploadModal'
 
 export interface ProductsCatalogProps {
   products: Product[]
@@ -11,6 +13,7 @@ export interface ProductsCatalogProps {
   onEditProduct: (product: Product) => void
   onDeleteProduct: (product: Product) => Promise<void> | void
   onToggleHero?: (product: Product) => Promise<void> | void
+  onRefreshProducts?: () => Promise<void>
 }
 
 export const ProductsCatalog: React.FC<ProductsCatalogProps> = ({
@@ -21,8 +24,10 @@ export const ProductsCatalog: React.FC<ProductsCatalogProps> = ({
   onEditProduct,
   onDeleteProduct,
   onToggleHero,
+  onRefreshProducts,
 }) => {
   const [search, setSearch] = useState('')
+  const [showBulkUploadModal, setShowBulkUploadModal] = useState(false)
 
   const filteredProducts = products.filter(
     (p) =>
@@ -40,13 +45,46 @@ export const ProductsCatalog: React.FC<ProductsCatalogProps> = ({
             Manage hardware, pipes, fittings, motors, and wholesale pricing
           </p>
         </div>
-        <button
-          onClick={onAddProductClick}
-          className="flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-xs font-bold text-white hover:bg-blue-700 transition-colors shadow-sm cursor-pointer"
-        >
-          <Plus className="h-4 w-4" />
-          <span>Add Product</span>
-        </button>
+        <div className="flex flex-wrap items-center gap-2.5">
+          <button
+            type="button"
+            onClick={() => downloadCatalogTemplate()}
+            className="flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50 transition-colors shadow-sm cursor-pointer"
+            title="Download blank Excel spreadsheet formatted for bulk catalog upload"
+          >
+            <Download className="h-3.5 w-3.5 text-slate-500" />
+            <span>Blank Template</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => exportCatalogToExcel(products)}
+            className="flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50 transition-colors shadow-sm cursor-pointer"
+            title="Export all current catalog products with list prices, trade discounts, and net prices to Excel"
+          >
+            <FileSpreadsheet className="h-3.5 w-3.5 text-emerald-600" />
+            <span>Export Catalog</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setShowBulkUploadModal(true)}
+            className="flex items-center gap-1.5 rounded-xl border border-blue-200 bg-blue-50/70 px-3.5 py-2 text-xs font-bold text-blue-700 hover:bg-blue-100 transition-colors shadow-sm cursor-pointer"
+            title="Upload supplier price sheets (.xlsx, .csv) with automatic calculations"
+          >
+            <UploadCloud className="h-4 w-4 text-blue-600" />
+            <span>Bulk Upload</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={onAddProductClick}
+            className="flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2 text-xs font-bold text-white hover:bg-blue-700 transition-colors shadow-sm cursor-pointer shadow-blue-500/10"
+          >
+            <Plus className="h-4 w-4" />
+            <span>Add Product</span>
+          </button>
+        </div>
       </div>
 
       <div className="rounded-2xl bg-white p-5 shadow-sm border border-slate-200/80">
@@ -105,83 +143,92 @@ export const ProductsCatalog: React.FC<ProductsCatalogProps> = ({
                 </tr>
               ) : (
                 filteredProducts.map((p) => (
-                <tr key={p.id} className="hover:bg-slate-50 transition-colors">
-                  <td className="py-3 px-4 font-bold text-slate-600">{p.product_code}</td>
-                  <td className="py-3 px-4 font-semibold text-slate-900">{p.product_name}</td>
-                  <td className="py-3 px-3">
-                    <span className="rounded bg-slate-100 px-2 py-0.5 font-bold text-slate-600">
-                      {p.unit}
-                    </span>
-                  </td>
-                  {enableListPriceMode && (
-                    <>
-                      <td className="py-3 px-4 text-right font-bold text-slate-900">
-                        {formatINR(p.list_price)}
-                      </td>
-                      <td className="py-3 px-3 text-right font-bold text-emerald-600">
-                        {p.discount_percentage}%
-                      </td>
-                    </>
-                  )}
-                  <td className="py-3 px-4 text-right font-bold text-slate-900">{formatINR(p.cost_price)}</td>
-                  <td className="py-3 px-3 text-right">
-                    <span className="rounded-full bg-blue-50 px-2.5 py-0.5 text-xs font-bold text-blue-700">
-                      +{p.margin_percentage ?? 15}%
-                    </span>
-                  </td>
-                  <td className="py-3 px-3 text-center">
-                    {onToggleHero ? (
-                      <button
-                        type="button"
-                        onClick={() => onToggleHero(p)}
-                        className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-bold transition-all cursor-pointer ${
-                          Boolean(p.is_hero)
-                            ? 'bg-amber-100 text-amber-900 border border-amber-300 shadow-xs'
-                            : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
-                        }`}
-                        title={
-                          Boolean(p.is_hero)
-                            ? 'Click to unmark as Hero Product'
-                            : 'Click to make this a Hero Product for bundles'
-                        }
-                      >
-                        <Sparkles
-                          className={`h-3 w-3 ${
-                            Boolean(p.is_hero) ? 'text-amber-600 fill-amber-500' : 'text-slate-400'
-                          }`}
-                        />
-                        <span>{Boolean(p.is_hero) ? 'Hero' : 'Set Hero'}</span>
-                      </button>
-                    ) : (
-                      Boolean(p.is_hero) && (
-                        <span className="rounded-full bg-amber-100 text-amber-900 px-2 py-0.5 text-[10px] font-extrabold">
-                          ⭐ Hero
-                        </span>
-                      )
+                  <tr key={p.id} className="hover:bg-slate-50 transition-colors">
+                    <td className="py-3 px-4 font-bold text-slate-600">{p.product_code}</td>
+                    <td className="py-3 px-4 font-semibold text-slate-900">{p.product_name}</td>
+                    <td className="py-3 px-3">
+                      <span className="rounded bg-slate-100 px-2 py-0.5 font-bold text-slate-600">
+                        {p.unit}
+                      </span>
+                    </td>
+                    {enableListPriceMode && (
+                      <>
+                        <td className="py-3 px-4 text-right font-bold text-slate-900">
+                          {formatINR(p.list_price)}
+                        </td>
+                        <td className="py-3 px-3 text-right font-bold text-emerald-600">
+                          {p.discount_percentage}%
+                        </td>
+                      </>
                     )}
-                  </td>
-                  <td className="py-3 px-4 text-center">
-                    <button
-                      onClick={() => onEditProduct(p)}
-                      className="rounded p-1 text-slate-400 hover:text-blue-600 mr-2 cursor-pointer"
-                      title="Edit product"
-                    >
-                      <Pencil className="h-4 w-4" />
-                    </button>
-                    <button
-                      onClick={() => onDeleteProduct(p)}
-                      className="rounded p-1 text-slate-400 hover:text-red-600 cursor-pointer"
-                      title="Delete product"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </button>
-                  </td>
-                </tr>
-              )))}
+                    <td className="py-3 px-4 text-right font-bold text-slate-900">{formatINR(p.cost_price)}</td>
+                    <td className="py-3 px-3 text-right">
+                      <span className="rounded-full bg-blue-50 px-2.5 py-0.5 text-xs font-bold text-blue-700">
+                        +{p.margin_percentage ?? 15}%
+                      </span>
+                    </td>
+                    <td className="py-3 px-3 text-center">
+                      {onToggleHero ? (
+                        <button
+                          type="button"
+                          onClick={() => onToggleHero(p)}
+                          className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-bold transition-all cursor-pointer ${Boolean(p.is_hero)
+                              ? 'bg-amber-100 text-amber-900 border border-amber-300 shadow-xs'
+                              : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+                            }`}
+                          title={
+                            Boolean(p.is_hero)
+                              ? 'Click to unmark as Hero Product'
+                              : 'Click to make this a Hero Product for bundles'
+                          }
+                        >
+                          <Sparkles
+                            className={`h-3 w-3 ${Boolean(p.is_hero) ? 'text-amber-600 fill-amber-500' : 'text-slate-400'
+                              }`}
+                          />
+                          <span>{Boolean(p.is_hero) ? 'Hero' : 'Set Hero'}</span>
+                        </button>
+                      ) : (
+                        Boolean(p.is_hero) && (
+                          <span className="rounded-full bg-amber-100 text-amber-900 px-2 py-0.5 text-[10px] font-extrabold">
+                            ⭐ Hero
+                          </span>
+                        )
+                      )}
+                    </td>
+                    <td className="py-3 px-4 text-center">
+                      <button
+                        onClick={() => onEditProduct(p)}
+                        className="rounded p-1 text-slate-400 hover:text-blue-600 mr-2 cursor-pointer"
+                        title="Edit product"
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </button>
+                      <button
+                        onClick={() => onDeleteProduct(p)}
+                        className="rounded p-1 text-slate-400 hover:text-red-600 cursor-pointer"
+                        title="Delete product"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </td>
+                  </tr>
+                )))}
             </tbody>
           </table>
         </div>
       </div>
+
+      <BulkUploadModal
+        isOpen={showBulkUploadModal}
+        existingProducts={products}
+        onClose={() => setShowBulkUploadModal(false)}
+        onSuccess={async () => {
+          if (onRefreshProducts) {
+            await onRefreshProducts()
+          }
+        }}
+      />
     </div>
   )
 }

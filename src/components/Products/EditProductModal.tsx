@@ -1,6 +1,12 @@
 import React, { useState, useEffect } from 'react'
 import { X, Loader2 } from 'lucide-react'
 import type { Product } from '../../types'
+import {
+  calculateCostFromListAndDiscount,
+  calculateDiscountFromListAndCost,
+  calculateNetPriceFromCostAndMargin,
+  calculateMarginFromCostAndNetPrice,
+} from '../../lib/pricing'
 
 export interface EditProductModalProps {
   product: Product | null
@@ -16,10 +22,18 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({
   onSave,
 }) => {
   const [formData, setFormData] = useState<Product | null>(product)
+  const [netPrice, setNetPrice] = useState<number | ''>('')
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   useEffect(() => {
     setFormData(product)
+    if (product) {
+      setNetPrice(
+        calculateNetPriceFromCostAndMargin(product.cost_price, product.margin_percentage ?? 15)
+      )
+    } else {
+      setNetPrice('')
+    }
   }, [product])
 
   if (!product || !formData) return null
@@ -93,7 +107,7 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({
           </div>
 
           {enableListPriceMode ? (
-            <div className="grid grid-cols-4 gap-2.5">
+            <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5">
               <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1">List (₹)</label>
                 <input
@@ -103,8 +117,10 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({
                   onChange={(e) => {
                     const list = parseFloat(e.target.value) || 0
                     const dis = formData.discount_percentage || 0
-                    const cost = Number((list * (1 - dis / 100)).toFixed(2))
+                    const m = formData.margin_percentage ?? 15
+                    const cost = calculateCostFromListAndDiscount(list, dis)
                     setFormData({ ...formData, list_price: list, cost_price: cost })
+                    setNetPrice(calculateNetPriceFromCostAndMargin(cost, m))
                   }}
                   className="w-full rounded-xl border border-slate-200 px-2.5 py-2 text-xs outline-none focus:border-blue-500 font-bold"
                 />
@@ -118,8 +134,10 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({
                   onChange={(e) => {
                     const dis = parseFloat(e.target.value) || 0
                     const list = formData.list_price || 0
-                    const cost = Number((list * (1 - dis / 100)).toFixed(2))
+                    const m = formData.margin_percentage ?? 15
+                    const cost = calculateCostFromListAndDiscount(list, dis)
                     setFormData({ ...formData, discount_percentage: dis, cost_price: cost })
+                    setNetPrice(calculateNetPriceFromCostAndMargin(cost, m))
                   }}
                   className="w-full rounded-xl border border-slate-200 px-2.5 py-2 text-xs outline-none focus:border-blue-500 font-bold text-emerald-600"
                 />
@@ -133,11 +151,13 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({
                   onChange={(e) => {
                     const cost = parseFloat(e.target.value) || 0
                     const list = formData.list_price || 0
+                    const m = formData.margin_percentage ?? 15
                     const dis =
                       list > 0 && cost > 0
-                        ? Number((((list - cost) / list) * 100).toFixed(2))
+                        ? calculateDiscountFromListAndCost(list, cost)
                         : formData.discount_percentage
                     setFormData({ ...formData, cost_price: cost, discount_percentage: dis })
+                    setNetPrice(calculateNetPriceFromCostAndMargin(cost, m))
                   }}
                   className="w-full rounded-xl border border-slate-200 px-2.5 py-2 text-xs outline-none focus:border-blue-500 font-bold text-slate-700"
                 />
@@ -148,43 +168,94 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({
                   type="number"
                   step="0.5"
                   value={formData.margin_percentage ?? 15}
-                  onChange={(e) =>
+                  onChange={(e) => {
+                    const m = parseFloat(e.target.value) || 0
                     setFormData({
                       ...formData,
-                      margin_percentage: parseFloat(e.target.value) || 0,
+                      margin_percentage: m,
                     })
-                  }
+                    setNetPrice(calculateNetPriceFromCostAndMargin(formData.cost_price, m))
+                  }}
                   className="w-full rounded-xl border border-blue-200 bg-blue-50/40 px-2.5 py-2 text-xs outline-none focus:border-blue-500 font-bold text-blue-700"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-emerald-700 mb-1">Net Price (₹)</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  placeholder="Auto"
+                  value={netPrice}
+                  onChange={(e) => {
+                    const n = parseFloat(e.target.value) || 0
+                    setNetPrice(n)
+                    if (formData.cost_price > 0 && n > 0) {
+                      const m = calculateMarginFromCostAndNetPrice(formData.cost_price, n)
+                      setFormData({
+                        ...formData,
+                        margin_percentage: m,
+                      })
+                    }
+                  }}
+                  className="w-full rounded-xl border border-emerald-300 bg-emerald-50/50 px-2.5 py-2 text-xs outline-none focus:border-emerald-500 font-mono font-bold text-emerald-800"
+                  title="Net selling price (auto updates margin %)"
                 />
               </div>
             </div>
           ) : (
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1">Cost Price (₹)</label>
                 <input
                   type="number"
                   step="0.01"
                   value={formData.cost_price}
-                  onChange={(e) =>
-                    setFormData({ ...formData, cost_price: parseFloat(e.target.value) || 0 })
-                  }
+                  onChange={(e) => {
+                    const cost = parseFloat(e.target.value) || 0
+                    const m = formData.margin_percentage ?? 15
+                    setFormData({ ...formData, cost_price: cost })
+                    setNetPrice(calculateNetPriceFromCostAndMargin(cost, m))
+                  }}
                   className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-500 font-bold text-slate-900"
                 />
               </div>
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">Product Margin (%)</label>
+                <label className="block text-xs font-bold text-slate-700 mb-1">Margin (%)</label>
                 <input
                   type="number"
                   step="0.5"
                   value={formData.margin_percentage ?? 15}
-                  onChange={(e) =>
+                  onChange={(e) => {
+                    const m = parseFloat(e.target.value) || 0
                     setFormData({
                       ...formData,
-                      margin_percentage: parseFloat(e.target.value) || 0,
+                      margin_percentage: m,
                     })
-                  }
+                    setNetPrice(calculateNetPriceFromCostAndMargin(formData.cost_price, m))
+                  }}
                   className="w-full rounded-xl border border-blue-200 bg-blue-50/40 px-3 py-2 text-sm outline-none focus:border-blue-500 font-bold text-blue-700"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-emerald-700 mb-1">Net Price (₹)</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  placeholder="Auto"
+                  value={netPrice}
+                  onChange={(e) => {
+                    const n = parseFloat(e.target.value) || 0
+                    setNetPrice(n)
+                    if (formData.cost_price > 0 && n > 0) {
+                      const m = calculateMarginFromCostAndNetPrice(formData.cost_price, n)
+                      setFormData({
+                        ...formData,
+                        margin_percentage: m,
+                      })
+                    }
+                  }}
+                  className="w-full rounded-xl border border-emerald-300 bg-emerald-50/50 px-3 py-2 text-sm outline-none focus:border-emerald-500 font-mono font-bold text-emerald-800"
+                  title="Net selling price (auto updates margin %)"
                 />
               </div>
             </div>

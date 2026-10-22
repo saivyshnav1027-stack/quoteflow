@@ -1,5 +1,11 @@
 import React, { useState, useEffect } from 'react'
 import { X, Loader2 } from 'lucide-react'
+import {
+  calculateNetPriceFromCostAndMargin,
+  calculateMarginFromCostAndNetPrice,
+  calculateDiscountFromListAndCost,
+  calculateCostFromListAndDiscount,
+} from '../../lib/pricing'
 
 export interface NewProductData {
   productName: string
@@ -35,6 +41,7 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({
   const [discountPercentage, setDiscountPercentage] = useState<number | ''>('')
   const [costPrice, setCostPrice] = useState<number | ''>('')
   const [marginPercentage, setMarginPercentage] = useState<number | ''>(15)
+  const [netPrice, setNetPrice] = useState<number | ''>('')
   const [submittingAction, setSubmittingAction] = useState<'catalog' | 'quote' | null>(null)
   const [errorMsg, setErrorMsg] = useState('')
 
@@ -75,6 +82,7 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({
       setDiscountPercentage('')
       setCostPrice('')
       setMarginPercentage(15)
+      setNetPrice('')
       onClose()
     } catch (err) {
       console.error(err)
@@ -152,7 +160,7 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({
           </div>
 
           {enableListPriceMode ? (
-            <div className="grid grid-cols-4 gap-2.5">
+            <div className="grid grid-cols-5 gap-2">
               <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1">List (₹) *</label>
                 <input
@@ -166,8 +174,11 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({
                     setListPrice(val)
                     const listNum = typeof val === 'number' ? val : 0
                     const disNum = typeof discountPercentage === 'number' ? discountPercentage : 0
+                    const mNum = typeof marginPercentage === 'number' ? marginPercentage : 15
                     if (listNum > 0) {
-                      setCostPrice(Number((listNum * (1 - disNum / 100)).toFixed(2)))
+                      const cost = calculateCostFromListAndDiscount(listNum, disNum)
+                      setCostPrice(cost)
+                      setNetPrice(calculateNetPriceFromCostAndMargin(cost, mNum))
                     }
                   }}
                   className="w-full rounded-xl border border-slate-200 px-2.5 py-2 text-xs outline-none focus:border-blue-500 font-bold"
@@ -185,8 +196,11 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({
                     setDiscountPercentage(val)
                     const listNum = typeof listPrice === 'number' ? listPrice : 0
                     const disNum = typeof val === 'number' ? val : 0
+                    const mNum = typeof marginPercentage === 'number' ? marginPercentage : 15
                     if (listNum > 0) {
-                      setCostPrice(Number((listNum * (1 - disNum / 100)).toFixed(2)))
+                      const cost = calculateCostFromListAndDiscount(listNum, disNum)
+                      setCostPrice(cost)
+                      setNetPrice(calculateNetPriceFromCostAndMargin(cost, mNum))
                     }
                   }}
                   className="w-full rounded-xl border border-slate-200 px-2.5 py-2 text-xs outline-none focus:border-blue-500 font-bold text-emerald-600"
@@ -204,8 +218,12 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({
                     setCostPrice(cVal)
                     const costNum = typeof cVal === 'number' ? cVal : 0
                     const listNum = typeof listPrice === 'number' ? listPrice : 0
+                    const mNum = typeof marginPercentage === 'number' ? marginPercentage : 15
                     if (listNum > 0 && costNum > 0) {
-                      setDiscountPercentage(Number((((listNum - costNum) / listNum) * 100).toFixed(2)))
+                      setDiscountPercentage(calculateDiscountFromListAndCost(listNum, costNum))
+                    }
+                    if (costNum > 0) {
+                      setNetPrice(calculateNetPriceFromCostAndMargin(costNum, mNum))
                     }
                   }}
                   className="w-full rounded-xl border border-slate-200 px-2.5 py-2 text-xs outline-none focus:border-blue-500 text-slate-700 font-semibold"
@@ -218,13 +236,41 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({
                   step="0.5"
                   placeholder="15"
                   value={marginPercentage}
-                  onChange={(e) => setMarginPercentage(parseFloat(e.target.value) || '')}
+                  onChange={(e) => {
+                    const mVal = parseFloat(e.target.value) || ''
+                    setMarginPercentage(mVal)
+                    const mNum = typeof mVal === 'number' ? mVal : 0
+                    const costNum = typeof costPrice === 'number' ? costPrice : 0
+                    if (costNum > 0) {
+                      setNetPrice(calculateNetPriceFromCostAndMargin(costNum, mNum))
+                    }
+                  }}
                   className="w-full rounded-xl border border-blue-200 bg-blue-50/40 px-2.5 py-2 text-xs outline-none focus:border-blue-500 font-bold text-blue-700"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-emerald-700 mb-1">Net Price (₹)</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  placeholder="Auto"
+                  value={netPrice}
+                  onChange={(e) => {
+                    const nVal = parseFloat(e.target.value) || ''
+                    setNetPrice(nVal)
+                    const nNum = typeof nVal === 'number' ? nVal : 0
+                    const costNum = typeof costPrice === 'number' ? costPrice : 0
+                    if (costNum > 0 && nNum > 0) {
+                      setMarginPercentage(calculateMarginFromCostAndNetPrice(costNum, nNum))
+                    }
+                  }}
+                  className="w-full rounded-xl border border-emerald-300 bg-emerald-50/50 px-2.5 py-2 text-xs outline-none focus:border-emerald-500 font-mono font-bold text-emerald-800"
+                  title="Net selling price (auto updates margin %)"
                 />
               </div>
             </div>
           ) : (
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-3 gap-3">
               <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1">
                   Cost Price (₹) *
@@ -235,7 +281,15 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({
                   required
                   placeholder="175.00"
                   value={costPrice}
-                  onChange={(e) => setCostPrice(parseFloat(e.target.value) || '')}
+                  onChange={(e) => {
+                    const cVal = parseFloat(e.target.value) || ''
+                    setCostPrice(cVal)
+                    const costNum = typeof cVal === 'number' ? cVal : 0
+                    const mNum = typeof marginPercentage === 'number' ? marginPercentage : 15
+                    if (costNum > 0) {
+                      setNetPrice(calculateNetPriceFromCostAndMargin(costNum, mNum))
+                    }
+                  }}
                   className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-500 text-slate-900 font-bold"
                 />
               </div>
@@ -248,8 +302,38 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({
                   step="0.5"
                   placeholder="15"
                   value={marginPercentage}
-                  onChange={(e) => setMarginPercentage(parseFloat(e.target.value) || '')}
+                  onChange={(e) => {
+                    const mVal = parseFloat(e.target.value) || ''
+                    setMarginPercentage(mVal)
+                    const mNum = typeof mVal === 'number' ? mVal : 0
+                    const costNum = typeof costPrice === 'number' ? costPrice : 0
+                    if (costNum > 0) {
+                      setNetPrice(calculateNetPriceFromCostAndMargin(costNum, mNum))
+                    }
+                  }}
                   className="w-full rounded-xl border border-blue-200 bg-blue-50/40 px-3 py-2 text-sm outline-none focus:border-blue-500 font-bold text-blue-700"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-emerald-700 mb-1">
+                  Net Price (₹)
+                </label>
+                <input
+                  type="number"
+                  step="0.01"
+                  placeholder="Auto"
+                  value={netPrice}
+                  onChange={(e) => {
+                    const nVal = parseFloat(e.target.value) || ''
+                    setNetPrice(nVal)
+                    const nNum = typeof nVal === 'number' ? nVal : 0
+                    const costNum = typeof costPrice === 'number' ? costPrice : 0
+                    if (costNum > 0 && nNum > 0) {
+                      setMarginPercentage(calculateMarginFromCostAndNetPrice(costNum, nNum))
+                    }
+                  }}
+                  className="w-full rounded-xl border border-emerald-300 bg-emerald-50/50 px-3 py-2 text-sm outline-none focus:border-emerald-500 font-mono font-bold text-emerald-800"
+                  title="Net selling price (auto updates margin %)"
                 />
               </div>
             </div>
