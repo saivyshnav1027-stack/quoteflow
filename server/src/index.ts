@@ -136,6 +136,7 @@ app.get(['/api/customers', '/customers'], async (_req, res) => {
         c.customer_name,
         c.phone,
         c.customer_type_id,
+        COALESCE(c.is_retailer, 0) AS is_retailer,
         ct.type_name,
         ct.markup_percentage
       FROM customers c
@@ -154,21 +155,22 @@ app.post(['/api/customers', '/customers'], async (req, res) => {
     const customerName = String(req.body.customerName ?? '').trim()
     const phone = String(req.body.phone ?? '').trim()
     const customerTypeId = Number(req.body.customerTypeId || 1)
+    const isRetailer = (req.body.isRetailer || req.body.is_retailer) ? 1 : 0
 
     if (!customerName) {
       return res.status(400).json({ success: false, message: 'Customer name is required' })
     }
 
     const result = await db.execute({
-      sql: `INSERT INTO customers (customer_name, phone, customer_type_id) VALUES (?, ?, ?)`,
-      args: [customerName, phone, customerTypeId],
+      sql: `INSERT INTO customers (customer_name, phone, customer_type_id, is_retailer) VALUES (?, ?, ?, ?)`,
+      args: [customerName, phone, customerTypeId, isRetailer],
     })
 
     const createdId = Number(result.lastInsertRowid)
 
     const fetchResult = await db.execute({
       sql: `
-        SELECT c.id, c.customer_name, c.phone, c.customer_type_id, ct.type_name, ct.markup_percentage
+        SELECT c.id, c.customer_name, c.phone, c.customer_type_id, COALESCE(c.is_retailer, 0) AS is_retailer, ct.type_name, ct.markup_percentage
         FROM customers c
         LEFT JOIN customer_types ct ON c.customer_type_id = ct.id
         WHERE c.id = ?
@@ -192,6 +194,9 @@ app.put(['/api/customers/:id', '/customers/:id'], async (req, res) => {
     const customerName = String(req.body.customerName ?? '').trim()
     const phone = String(req.body.phone ?? '').trim()
     const customerTypeId = Number(req.body.customerTypeId || 1)
+    const isRetailer = (req.body.isRetailer !== undefined || req.body.is_retailer !== undefined)
+      ? (req.body.isRetailer || req.body.is_retailer ? 1 : 0)
+      : 0
 
     if (!Number.isInteger(id)) {
       return res.status(400).json({ success: false, message: 'Invalid customer ID' })
@@ -202,14 +207,74 @@ app.put(['/api/customers/:id', '/customers/:id'], async (req, res) => {
     }
 
     await db.execute({
-      sql: `UPDATE customers SET customer_name = ?, phone = ?, customer_type_id = ? WHERE id = ?`,
-      args: [customerName, phone, customerTypeId, id],
+      sql: `UPDATE customers SET customer_name = ?, phone = ?, customer_type_id = ?, is_retailer = ? WHERE id = ?`,
+      args: [customerName, phone, customerTypeId, isRetailer, id],
     })
 
     res.json({ success: true, message: 'Customer updated successfully' })
   } catch (error) {
     console.error('Update customer error:', error)
     res.status(500).json({ success: false, message: 'Failed to update customer' })
+  }
+})
+
+app.get(['/api/customers/:id/rate-history', '/customers/:id/rate-history'], async (req, res) => {
+  try {
+    const customerId = Number(req.params.id)
+    if (!Number.isInteger(customerId)) {
+      return res.status(400).json({ success: false, message: 'Invalid customer ID' })
+    }
+
+    const result = await db.execute({
+      sql: `
+        SELECT
+          qi.product_id,
+          qi.description,
+          qi.price AS last_price,
+          qi.cost_price AS last_cost_price,
+          qi.margin_percentage AS last_margin_percentage,
+          qi.discount AS last_discount,
+          qi.discount_type AS last_discount_type,
+          qi.list_price AS last_list_price,
+          qi.discount_percentage AS last_discount_percentage,
+          q.quotation_number,
+          q.created_at
+        FROM quotation_items qi
+        JOIN quotations q ON q.id = qi.quotation_id
+        WHERE q.customer_id = ?
+        ORDER BY q.created_at DESC, q.id DESC, qi.id DESC
+      `,
+      args: [customerId],
+    })
+
+    const historyMap: Record<number, any> = {}
+    for (const row of result.rows) {
+      const pid = Number(row.product_id)
+      if (pid && !historyMap[pid]) {
+        historyMap[pid] = {
+          productId: pid,
+          productName: String(row.description || ''),
+          lastPrice: Number(row.last_price || 0),
+          lastCostPrice: Number(row.last_cost_price || 0),
+          lastMarginPercentage: Number(row.last_margin_percentage || 0),
+          lastDiscount: Number(row.last_discount || 0),
+          lastDiscountType: String(row.last_discount_type || 'PERCENT'),
+          lastListPrice: Number(row.last_list_price || 0),
+          lastDiscountPercentage: Number(row.last_discount_percentage || 0),
+          quotationNumber: String(row.quotation_number || ''),
+          createdAt: String(row.created_at || ''),
+        }
+      }
+    }
+
+    res.json({
+      success: true,
+      customerId,
+      rates: historyMap,
+    })
+  } catch (error) {
+    console.error('Fetch customer rate history error:', error)
+    res.status(500).json({ success: false, message: 'Failed to fetch customer rate history' })
   }
 })
 
@@ -969,6 +1034,7 @@ app.get(['/api/quotations', '/quotations'], async (_req, res) => {
         q.customer_id,
         COALESCE(c.customer_name, 'Guest Walk-In') AS customer_name,
         COALESCE(c.phone, '') AS phone,
+        COALESCE(c.is_retailer, 0) AS is_retailer,
         q.subtotal,
         q.total_units,
         q.total,
@@ -1260,25 +1326,35 @@ app.delete(['/api/quotations', '/quotations'], async (req, res) => {
   try {
     const timeline = String(req.query.timeline || req.body?.timeline || '').toLowerCase()
     const olderThanDays = req.query.olderThanDays ? Number(req.query.olderThanDays) : null
+    const preserveRetailers = req.query.preserve_retailers === 'true' || req.query.preserveRetailers === 'true' || req.body?.preserveRetailers === true
 
     let matchingSql = `SELECT id FROM quotations`
     let args: any[] = []
+    let conditions: string[] = []
 
     if (timeline === 'weekly' || olderThanDays === 7) {
       const cutoff = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
-      matchingSql += ` WHERE created_at < ? OR datetime(created_at) < datetime('now', '-7 days')`
-      args = [cutoff]
+      conditions.push(`(created_at < ? OR datetime(created_at) < datetime('now', '-7 days'))`)
+      args.push(cutoff)
     } else if (timeline === 'monthly' || olderThanDays === 30) {
       const cutoff = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()
-      matchingSql += ` WHERE created_at < ? OR datetime(created_at) < datetime('now', '-30 days')`
-      args = [cutoff]
+      conditions.push(`(created_at < ? OR datetime(created_at) < datetime('now', '-30 days'))`)
+      args.push(cutoff)
     } else if (timeline === 'all') {
-      // Purge all records
+      // Purge all records matching retailer filter
     } else {
       return res.status(400).json({
         success: false,
         message: 'Invalid timeline. Specify timeline=weekly, monthly, or all',
       })
+    }
+
+    if (preserveRetailers) {
+      conditions.push(`(customer_id IS NULL OR customer_id NOT IN (SELECT id FROM customers WHERE is_retailer = 1))`)
+    }
+
+    if (conditions.length > 0) {
+      matchingSql += ` WHERE ` + conditions.join(' AND ')
     }
 
     const matches = await db.execute({
@@ -1321,7 +1397,7 @@ app.delete(['/api/quotations', '/quotations'], async (req, res) => {
 // =====================================================
 // START SERVER
 // =====================================================
-const PORT = process.env.PORT || 3000
+const PORT = process.env.PORT || 5001
 
 if (!process.env.VERCEL) {
   app.listen(PORT, () => {

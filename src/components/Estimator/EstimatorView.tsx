@@ -11,6 +11,8 @@ import {
   Share2,
   Check,
   Layers,
+  Store,
+  AlertTriangle,
 } from 'lucide-react'
 import type { Customer, Product, EstimateRow, HeroProductWithChildren, EstimatorSummary } from '../../types'
 import { formatINR } from '../../lib/pricing'
@@ -30,6 +32,7 @@ export interface EstimatorViewProps {
   estimateRows: EstimateRow[]
   onUpdateRow: (id: string, field: keyof EstimateRow, value: any) => void
   onRemoveRow: (id: string) => void
+  onResetRowToCatalog?: (rowId: string) => void
   summary: EstimatorSummary
   cashDiscount?: number
   onCashDiscountChange?: (val: number) => void
@@ -62,6 +65,7 @@ export const EstimatorView: React.FC<EstimatorViewProps> = ({
   estimateRows,
   onUpdateRow,
   onRemoveRow,
+  onResetRowToCatalog,
   summary,
   cashDiscount = 0,
   onCashDiscountChange,
@@ -250,7 +254,15 @@ export const EstimatorView: React.FC<EstimatorViewProps> = ({
                         className="flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm hover:bg-slate-50 transition-colors cursor-pointer"
                       >
                         <div className="flex flex-col">
-                          <span className="font-semibold text-slate-800">{c.customer_name}</span>
+                          <div className="flex items-center gap-1.5">
+                            <span className="font-semibold text-slate-800">{c.customer_name}</span>
+                            {Boolean(c.is_retailer) && (
+                              <span className="inline-flex items-center gap-0.5 rounded-full bg-indigo-50 border border-indigo-200 px-1.5 py-0.2 text-[10px] font-bold text-indigo-700">
+                                <Store className="h-2.5 w-2.5" />
+                                <span>Retailer</span>
+                              </span>
+                            )}
+                          </div>
                           <span className="text-xs text-slate-400">{c.phone || 'No phone'}</span>
                         </div>
                         <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-[11px] font-semibold text-slate-600">
@@ -303,16 +315,25 @@ export const EstimatorView: React.FC<EstimatorViewProps> = ({
               <div className="flex flex-col">
                 <div className="flex items-center gap-2">
                   <span className="font-bold text-slate-900">{selectedCustomer.customer_name}</span>
-                  <span className="rounded-full bg-blue-50 px-2.5 py-0.5 text-[11px] font-bold text-blue-700">
-                    {selectedCustomer.id === 0 ? 'Cash Customer' : 'Counter Client'}
-                  </span>
+                  {Boolean(selectedCustomer.is_retailer) ? (
+                    <span className="inline-flex items-center gap-1 rounded-full bg-indigo-50 border border-indigo-200 px-2.5 py-0.5 text-[11px] font-bold text-indigo-700">
+                      <Store className="h-3 w-3" />
+                      <span>Village Retailer — Rate Memory Active</span>
+                    </span>
+                  ) : (
+                    <span className="rounded-full bg-blue-50 px-2.5 py-0.5 text-[11px] font-bold text-blue-700">
+                      {selectedCustomer.id === 0 ? 'Cash Customer' : 'Counter Client'}
+                    </span>
+                  )}
                 </div>
                 <span className="text-xs text-slate-500">
                   {selectedCustomer.phone || 'Walk-in / Cash Customer'}
                 </span>
               </div>
             </div>
-            <div className="text-xs text-slate-400">Direct product margin pricing applied</div>
+            <div className="text-xs text-slate-500 font-medium">
+              {Boolean(selectedCustomer.is_retailer) ? 'Latest quoted party rates auto-applied' : 'Standard catalog margin pricing'}
+            </div>
           </div>
         )}
       </div>
@@ -501,6 +522,34 @@ export const EstimatorView: React.FC<EstimatorViewProps> = ({
                         onChange={(e) => onUpdateRow(row.id, 'description', e.target.value)}
                         className="w-full rounded bg-transparent px-1 py-0.5 font-semibold text-slate-900 outline-none focus:bg-white focus:ring-1 focus:ring-blue-400"
                       />
+                      {row.isRateFromHistory && row.lastQuotedPrice !== undefined && (
+                        <div className="flex flex-wrap items-center gap-1.5 mt-1">
+                          <span className="inline-flex items-center gap-1 rounded-md bg-amber-50 border border-amber-200 px-1.5 py-0.5 text-[10px] font-bold text-amber-800">
+                            <span>⚡ Last Quoted: ₹{row.lastQuotedPrice.toFixed(2)}</span>
+                            {row.lastQuotedEstimateNo && (
+                              <span className="text-amber-600 font-normal">({row.lastQuotedEstimateNo})</span>
+                            )}
+                          </span>
+
+                          {row.costPrice > row.lastQuotedPrice && (
+                            <span className="inline-flex items-center gap-0.5 rounded-md bg-rose-50 border border-rose-200 px-1.5 py-0.5 text-[10px] font-bold text-rose-700 animate-pulse">
+                              <AlertTriangle className="h-2.5 w-2.5 text-rose-600" />
+                              <span>Cost (₹{row.costPrice.toFixed(2)}) &gt; Rate</span>
+                            </span>
+                          )}
+
+                          {onResetRowToCatalog && (
+                            <button
+                              type="button"
+                              onClick={() => onResetRowToCatalog(row.id)}
+                              className="text-[10px] text-blue-600 hover:text-blue-800 underline font-semibold cursor-pointer"
+                              title="Reset this item to standard master catalog price"
+                            >
+                              Reset to Catalog
+                            </button>
+                          )}
+                        </div>
+                      )}
                     </td>
                     <td className="py-2.5 px-3 text-right">
                       <input

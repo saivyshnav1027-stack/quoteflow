@@ -3,8 +3,23 @@ export interface Customer {
   customer_name: string
   phone: string
   customer_type_id: number
+  is_retailer?: boolean | number
   type_name?: string
   markup_percentage?: number
+}
+
+export interface CustomerRateHistoryItem {
+  productId: number
+  productName?: string
+  lastPrice: number
+  lastCostPrice: number
+  lastMarginPercentage: number
+  lastDiscount: number
+  lastDiscountType: string
+  lastListPrice: number
+  lastDiscountPercentage: number
+  quotationNumber: string
+  createdAt: string
 }
 
 export interface Product {
@@ -60,6 +75,10 @@ export interface EstimateRow {
   originalDiscountPercentage?: number
   originalCostPrice?: number
   originalMarginPercentage?: number
+  lastQuotedPrice?: number
+  lastQuotedEstimateNo?: string
+  lastQuotedDate?: string
+  isRateFromHistory?: boolean
 }
 
 export interface Quotation {
@@ -68,6 +87,7 @@ export interface Quotation {
   customer_id: number | null
   customer_name: string
   phone: string
+  is_retailer?: boolean | number
   subtotal: number
   total_units: number
   total: number
@@ -99,7 +119,7 @@ export interface PrintQuoteData {
   items: EstimateRow[]
 }
 
-export type ActivePage = 'Dashboard' | 'Estimator' | 'Products' | 'HeroProducts' | 'Customers' | 'Settings'
+export type ActivePage = 'Dashboard' | 'Estimates' | 'Estimator' | 'Products' | 'HeroProducts' | 'Customers' | 'Settings'
 
 export type PricingSuperiorityMode = 'PRICE' | 'PERCENTAGE'
 

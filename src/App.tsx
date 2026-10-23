@@ -1,6 +1,6 @@
-import { useEffect, useState, useMemo } from 'react'
-import { CheckCircle2 } from 'lucide-react'
-import type { Customer, Product, EstimateRow, Quotation, PrintQuoteData, ActivePage, HeroProductWithChildren, PricingSuperiorityMode } from './types'
+import { useEffect, useState, useMemo, useCallback } from 'react'
+import { CheckCircle2, Menu } from 'lucide-react'
+import type { Customer, Product, EstimateRow, Quotation, PrintQuoteData, ActivePage, HeroProductWithChildren, PricingSuperiorityMode, CustomerRateHistoryItem } from './types'
 import { calculateRow as calcRow, calculateTotals } from './lib/pricing'
 import { getWhatsAppShareUrl } from './lib/whatsapp'
 import { getNextEstimateNumber, incrementEstimateNumber, getTodayDatePrefix } from './lib/estimateNumber'
@@ -8,6 +8,7 @@ import { getNextEstimateNumber, incrementEstimateNumber, getTodayDatePrefix } fr
 import { LoginScreen } from './components/Auth/LoginScreen'
 import { Sidebar } from './components/Layout/Sidebar'
 import { DashboardView } from './components/Dashboard/DashboardView'
+import { EstimatesView } from './components/Estimates/EstimatesView'
 import { EstimatorView } from './components/Estimator/EstimatorView'
 import { ProductsCatalog } from './components/Products/ProductsCatalog'
 import { HeroProductsView } from './components/HeroProducts/HeroProductsView'
@@ -82,8 +83,12 @@ function App() {
     message: 'Turso Cloud DB Synchronized',
   })
 
+  // Floating Sidebar State
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false)
+
   // Estimator State
   const [selectedCustomer, setSelectedCustomer] = useState<Customer>(INITIAL_CUSTOMERS[0])
+  const [customerRateHistory, setCustomerRateHistory] = useState<Record<number, CustomerRateHistoryItem>>({})
   const [estimateRows, setEstimateRows] = useState<EstimateRow[]>([])
   const [editingQuotationId, setEditingQuotationId] = useState<number | null>(null)
   const [editingEstimateNo, setEditingEstimateNo] = useState<string>('')
@@ -91,6 +96,31 @@ function App() {
   const [saveSuccessMsg, setSaveSuccessMsg] = useState('')
   const [whatsappSharedNotice, setWhatsappSharedNotice] = useState(false)
   const [cashDiscount, setCashDiscount] = useState<number>(0)
+
+  // Fetch Customer Rate History when Customer changes or on demand
+  const refreshCustomerRateHistory = useCallback(async (cid?: number) => {
+    const targetId = cid ?? selectedCustomer?.id
+    if (targetId && targetId > 0) {
+      try {
+        const res = await fetch(`/api/customers/${targetId}/rate-history`)
+        if (res.ok) {
+          const data = await res.json()
+          if (data?.rates) {
+            setCustomerRateHistory(data.rates)
+            return data.rates
+          }
+        }
+      } catch (e) {
+        console.error('Failed to fetch rate history:', e)
+      }
+    }
+    setCustomerRateHistory({})
+    return {}
+  }, [selectedCustomer?.id])
+
+  useEffect(() => {
+    refreshCustomerRateHistory(selectedCustomer?.id)
+  }, [selectedCustomer?.id, refreshCustomerRateHistory])
 
   // Print Slip Modal State
   const [showPrintModal, setShowPrintModal] = useState(false)
@@ -105,7 +135,7 @@ function App() {
 
   // Toast Notifications State
   const [toasts, setToasts] = useState<ToastMessage[]>([])
-  const addToast = (type: 'success' | 'error' | 'info', text: string) => {
+  const addToast = (type: 'success' | 'error' | 'info' | 'warning', text: string) => {
     const id = `${Date.now()}-${Math.random()}`
     setToasts((prev) => [...prev, { id, type, text }])
   }
@@ -335,12 +365,19 @@ function App() {
     }
   }
 
-  // Estimator Calculations via pure engine
+  // Estimator Calculations via pure engine with Customer Rate History Memory
   const addProductToEstimate = (prod: Product) => {
     const cost = Number(prod.cost_price || 0)
     const margin = Number(prod.margin_percentage ?? 15)
 
     const rowsToAdd: EstimateRow[] = []
+
+    const historyItem = selectedCustomer?.id ? customerRateHistory[prod.id] : undefined
+    const hasHistory = Boolean(historyItem && historyItem.lastPrice > 0)
+    const historyPrice = hasHistory ? Number(historyItem!.lastPrice) : 0
+    const derivedMargin = hasHistory && cost > 0
+      ? Number((((historyPrice - cost) / cost) * 100).toFixed(2))
+      : margin
 
     const primaryRow: EstimateRow = calcRow(
       {
@@ -354,20 +391,32 @@ function App() {
         listPrice: prod.list_price || 0,
         discountPercentage: prod.discount_percentage || 0,
         costPrice: cost,
-        marginPercentage: margin,
+        marginPercentage: derivedMargin,
         discount: 0,
         discountType: 'PERCENT',
-        price: 0,
+        price: hasHistory ? historyPrice : 0,
         lineTotal: 0,
         updateListPriceInDb: false,
         originalListPrice: prod.list_price || 0,
         originalDiscountPercentage: prod.discount_percentage || 0,
         originalCostPrice: cost,
         originalMarginPercentage: margin,
+        lastQuotedPrice: hasHistory ? historyPrice : undefined,
+        lastQuotedEstimateNo: hasHistory ? historyItem!.quotationNumber : undefined,
+        lastQuotedDate: hasHistory ? historyItem!.createdAt : undefined,
+        isRateFromHistory: hasHistory,
       },
-      enableListPriceMode
+      enableListPriceMode,
+      hasHistory ? 'price' : undefined
     )
     rowsToAdd.push(primaryRow)
+
+    if (hasHistory) {
+      addToast('info', `Applied last quoted rate ₹${historyPrice.toFixed(2)} from #${historyItem!.quotationNumber} for "${prod.product_name}".`)
+      if (cost > historyPrice) {
+        addToast('warning', `⚠️ Warning: Last quoted rate ₹${historyPrice.toFixed(2)} for "${prod.product_name}" is below current cost price ₹${cost.toFixed(2)}!`)
+      }
+    }
 
     // Check if this is a Hero Product with child components
     const heroRecord = heroProducts.find((h) => h.id === prod.id)
@@ -410,6 +459,31 @@ function App() {
     }
 
     setEstimateRows((prev) => [...prev, ...rowsToAdd])
+  }
+
+  const resetRowToCatalog = (rowId: string) => {
+    setEstimateRows((prev) =>
+      prev.map((r) => {
+        if (r.id !== rowId) return r
+        const prod = products.find((p) => p.id === r.productId)
+        const cost = prod ? Number(prod.cost_price || 0) : Number(r.originalCostPrice || 0)
+        const margin = prod ? Number(prod.margin_percentage ?? 15) : Number(r.originalMarginPercentage ?? 15)
+        const list = prod ? Number(prod.list_price || 0) : Number(r.originalListPrice || 0)
+        const dis = prod ? Number(prod.discount_percentage || 0) : Number(r.originalDiscountPercentage || 0)
+
+        const updated: EstimateRow = {
+          ...r,
+          costPrice: cost,
+          marginPercentage: margin,
+          listPrice: list,
+          discountPercentage: dis,
+          price: 0,
+          isRateFromHistory: false,
+        }
+        return calcRow(updated, enableListPriceMode)
+      })
+    )
+    addToast('info', 'Reset item to standard catalog pricing.')
   }
 
   const updateRow = (id: string, field: keyof EstimateRow, val: any) => {
@@ -578,6 +652,9 @@ function App() {
         )
         setTimeout(() => setSaveSuccessMsg(''), 4000)
         loadQuotations()
+        if (selectedCustomer?.id) {
+          refreshCustomerRateHistory(selectedCustomer.id)
+        }
 
         setPrintQuoteData({
           invoiceNo: savedQuoteNo,
@@ -953,7 +1030,7 @@ function App() {
     })
   }
 
-  const handlePurgeQuotations = (timeline: 'weekly' | 'monthly' | 'all') => {
+  const handlePurgeQuotations = (timeline: 'weekly' | 'monthly' | 'all', preserveRetailers = true) => {
     const label =
       timeline === 'weekly'
         ? 'older than 7 days (Weekly)'
@@ -961,15 +1038,19 @@ function App() {
         ? 'older than 30 days (Monthly)'
         : 'ALL estimate records'
 
+    const filterNote = preserveRetailers
+      ? ' (Preserving all regular Retailer estimates)'
+      : ' (Including all Retailer estimates)'
+
     setConfirmModal({
       isOpen: true,
       title: `Purge Estimates: ${timeline.toUpperCase()}`,
-      message: `Are you sure you want to permanently delete estimates ${label}? This cannot be undone.`,
+      message: `Are you sure you want to permanently delete estimates ${label}${filterNote}? This cannot be undone.`,
       confirmText: `Purge ${timeline === 'all' ? 'All Estimates' : 'Estimates'}`,
       variant: 'danger',
       onConfirm: async () => {
         try {
-          const res = await fetch(`${API_BASE}/quotations?timeline=${timeline}`, { method: 'DELETE' })
+          const res = await fetch(`${API_BASE}/quotations?timeline=${timeline}&preserveRetailers=${preserveRetailers ? 'true' : 'false'}`, { method: 'DELETE' })
           const data = await res.json()
           if (data.success) {
             addToast('success', `Cleanup complete: ${data.deletedCount ?? 0} estimate(s) deleted.`)
@@ -987,7 +1068,7 @@ function App() {
   }
 
   // CRUD Handlers
-  const handleCreateCustomer = async (customerName: string, phone: string) => {
+  const handleCreateCustomer = async (customerName: string, phone: string, isRetailer = false) => {
     try {
       const res = await fetch(`${API_BASE}/customers`, {
         method: 'POST',
@@ -996,6 +1077,7 @@ function App() {
           customerName,
           phone,
           customerTypeId: 1,
+          isRetailer,
         }),
       })
       const data = await res.json()
@@ -1005,12 +1087,40 @@ function App() {
           setSelectedCustomer(data.customer)
         }
         setShowNewCustomerModal(false)
-        addToast('success', `Customer "${customerName}" added successfully.`)
+        addToast('success', `${isRetailer ? 'Retailer' : 'Customer'} "${customerName}" added successfully.`)
       } else {
         addToast('error', data.message || 'Failed to add customer.')
       }
     } catch {
       addToast('error', 'Network error while adding customer.')
+    }
+  }
+
+  const handleToggleRetailer = async (c: Customer) => {
+    try {
+      const newStatus = c.is_retailer ? 0 : 1
+      const res = await fetch(`${API_BASE}/customers/${c.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          customerName: c.customer_name,
+          phone: c.phone,
+          customerTypeId: c.customer_type_id || 1,
+          isRetailer: newStatus === 1,
+        }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (res.ok) {
+        await loadCustomers()
+        addToast('success', `Updated "${c.customer_name}" to ${newStatus === 1 ? 'Retailer' : 'Regular'} account.`)
+        if (selectedCustomer?.id === c.id) {
+          setSelectedCustomer({ ...selectedCustomer, is_retailer: newStatus })
+        }
+      } else {
+        addToast('error', data.message || 'Failed to update customer type.')
+      }
+    } catch {
+      addToast('error', 'Network error while updating customer type.')
     }
   }
 
@@ -1146,25 +1256,47 @@ function App() {
 
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-slate-50 font-sans text-slate-800 antialiased selection:bg-blue-500 selection:text-white">
-      {/* 1. FIXED LEFT SIDEBAR */}
+      {/* Edge hover sensor to slide in floating sidebar */}
+      <div
+        className="no-print fixed inset-y-0 left-0 w-3 z-30 cursor-pointer group"
+        onMouseEnter={() => setIsSidebarOpen(true)}
+        title="Hover to open navigation menu"
+      >
+        <div className="h-full w-1 bg-transparent group-hover:bg-blue-600/50 rounded-r-full transition-all" />
+      </div>
+
+      {/* Floating Sidebar Drawer */}
       <Sidebar
         activePage={activePage}
         setActivePage={setActivePage}
         productCount={products.length}
         customerCount={customers.length}
         heroProductCount={heroProducts.length}
+        quotationsCount={quotations.length}
         dbStatus={dbStatus}
+        isOpen={isSidebarOpen}
+        onClose={() => setIsSidebarOpen(false)}
         onLogout={handleLogout}
       />
 
-      {/* 2. MAIN CONTENT AREA */}
+      {/* 2. MAIN CONTENT AREA (Takes 100% full screen width) */}
       <div className="flex flex-1 flex-col overflow-y-auto">
-        <header className="no-print sticky top-0 z-20 flex h-16 shrink-0 items-center justify-between border-b border-slate-200 bg-white/90 px-8 backdrop-blur-md">
+        <header className="no-print sticky top-0 z-20 flex h-16 shrink-0 items-center justify-between border-b border-slate-200 bg-white/90 px-6 backdrop-blur-md">
           <div className="flex items-center gap-3">
-            <span className="text-sm font-semibold text-slate-700">Wholesale Depot & Agro-Trading Hub</span>
-            <span className="hidden sm:inline-block rounded-md bg-blue-50 px-2 py-0.5 text-xs font-bold text-blue-700">
-              Station Road, Jammikunta
-            </span>
+            <button
+              type="button"
+              onClick={() => setIsSidebarOpen(true)}
+              className="flex items-center justify-center p-2 rounded-xl text-slate-700 hover:bg-slate-100 hover:text-blue-600 transition-colors cursor-pointer border border-slate-200 shadow-2xs"
+              title="Open Navigation Menu"
+            >
+              <Menu className="h-5 w-5" />
+            </button>
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-bold text-slate-800">Sri Venkateshwara Trading & Co.</span>
+              <span className="hidden sm:inline-block rounded-md bg-blue-50 px-2 py-0.5 text-xs font-bold text-blue-700">
+                Wholesale Depot
+              </span>
+            </div>
           </div>
           <div className="flex items-center gap-4 text-xs font-semibold text-slate-500">
             <span className="flex items-center gap-1.5">
@@ -1187,6 +1319,19 @@ function App() {
           {activePage === 'Dashboard' && (
             <DashboardView
               quotations={quotations}
+              products={products}
+              customers={customers}
+              onCreateEstimateClick={() => setActivePage('Estimator')}
+              onNavigateToEstimates={() => setActivePage('Estimates')}
+              onNavigateToProducts={() => setActivePage('Products')}
+              onNavigateToCustomers={() => setActivePage('Customers')}
+              onViewPrintSlip={handleViewQuotationPrintSlip}
+            />
+          )}
+
+          {activePage === 'Estimates' && (
+            <EstimatesView
+              quotations={quotations}
               isLoading={isQuotationsLoading}
               onCreateEstimateClick={() => setActivePage('Estimator')}
               onViewPrintSlip={handleViewQuotationPrintSlip}
@@ -1202,7 +1347,10 @@ function App() {
               onNewEstimateClick={clearCurrentEstimate}
               customers={customers}
               selectedCustomer={selectedCustomer}
-              onSelectCustomer={(c) => setSelectedCustomer(c)}
+              onSelectCustomer={(c) => {
+                setSelectedCustomer(c)
+                refreshCustomerRateHistory(c.id)
+              }}
               onNewCustomerClick={() => setShowNewCustomerModal(true)}
               products={products}
               onAddProductToEstimate={addProductToEstimate}
@@ -1214,6 +1362,7 @@ function App() {
               estimateRows={estimateRows}
               onUpdateRow={updateRow}
               onRemoveRow={removeRow}
+              onResetRowToCatalog={resetRowToCatalog}
               summary={summary}
               cashDiscount={cashDiscount}
               onCashDiscountChange={setCashDiscount}
@@ -1271,8 +1420,10 @@ function App() {
               onAddCustomerClick={() => setShowNewCustomerModal(true)}
               onSelectForEstimate={(c) => {
                 setSelectedCustomer(c)
+                refreshCustomerRateHistory(c.id)
                 setActivePage('Estimator')
               }}
+              onToggleRetailer={handleToggleRetailer}
               onDeleteCustomer={handleDeleteCustomer}
             />
           )}

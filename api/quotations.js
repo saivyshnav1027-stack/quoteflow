@@ -82,6 +82,7 @@ export default async function handler(req, res) {
           q.customer_id,
           COALESCE(c.customer_name, 'Guest Walk-In') AS customer_name,
           COALESCE(c.phone, '') AS phone,
+          COALESCE(c.is_retailer, 0) AS is_retailer,
           q.subtotal,
           q.total_units,
           q.total,
@@ -488,18 +489,20 @@ export default async function handler(req, res) {
       // 2. Timeline-based batch deletion
       const timeline = String(req.query.timeline || req.body?.timeline || '').toLowerCase()
       const olderThanDays = req.query.olderThanDays ? Number(req.query.olderThanDays) : null
+      const preserveRetailers = req.query.preserve_retailers === 'true' || req.query.preserveRetailers === 'true' || req.body?.preserveRetailers === true
 
       let matchingSql = `SELECT id FROM quotations`
       let args = []
+      let conditions = []
 
       if (timeline === 'weekly' || olderThanDays === 7) {
         const cutoff = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
-        matchingSql += ` WHERE created_at < ? OR datetime(created_at) < datetime('now', '-7 days')`
-        args = [cutoff]
+        conditions.push(`(created_at < ? OR datetime(created_at) < datetime('now', '-7 days'))`)
+        args.push(cutoff)
       } else if (timeline === 'monthly' || olderThanDays === 30) {
         const cutoff = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()
-        matchingSql += ` WHERE created_at < ? OR datetime(created_at) < datetime('now', '-30 days')`
-        args = [cutoff]
+        conditions.push(`(created_at < ? OR datetime(created_at) < datetime('now', '-30 days'))`)
+        args.push(cutoff)
       } else if (timeline === 'all') {
         // Purge all records
       } else {
@@ -507,6 +510,14 @@ export default async function handler(req, res) {
           success: false,
           message: 'Invalid request. Provide id or timeline=weekly, monthly, or all',
         })
+      }
+
+      if (preserveRetailers) {
+        conditions.push(`(customer_id IS NULL OR customer_id NOT IN (SELECT id FROM customers WHERE is_retailer = 1))`)
+      }
+
+      if (conditions.length > 0) {
+        matchingSql += ` WHERE ` + conditions.join(' AND ')
       }
 
       const matches = await db.execute({

@@ -20,6 +20,7 @@ export async function initSchema() {
       customer_name TEXT NOT NULL,
       phone TEXT NOT NULL,
       customer_type_id INTEGER NOT NULL,
+      is_retailer INTEGER NOT NULL DEFAULT 0,
       created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (customer_type_id) REFERENCES customer_types(id)
     )
@@ -122,6 +123,11 @@ export async function initSchema() {
   }
   try {
     await db.execute("ALTER TABLE quotation_items ADD COLUMN discount_type TEXT NOT NULL DEFAULT 'PERCENT'")
+  } catch {
+    // column already exists
+  }
+  try {
+    await db.execute('ALTER TABLE customers ADD COLUMN is_retailer INTEGER NOT NULL DEFAULT 0')
   } catch {
     // column already exists
   }

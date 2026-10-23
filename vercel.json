@@ -1,5 +1,7 @@
 {
   "rewrites": [
+    { "source": "/api/customers/:id/rate-history", "destination": "/api/customer-rates?customerId=:id" },
+    { "source": "/api/customers/:id", "destination": "/api/customers?id=:id" },
     { "source": "/api/products/:id", "destination": "/api/products?id=:id" },
     { "source": "/api/customer-types/:id", "destination": "/api/customer-types?id=:id" },
     { "source": "/api/quotations/:id", "destination": "/api/quotations?id=:id" },

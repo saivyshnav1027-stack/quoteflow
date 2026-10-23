@@ -22,6 +22,7 @@ export default async function handler(req, res) {
           c.customer_name, 
           c.phone, 
           c.customer_type_id,
+          COALESCE(c.is_retailer, 0) AS is_retailer,
           ct.type_name,
           ct.markup_percentage
         FROM customers c
@@ -41,20 +42,21 @@ export default async function handler(req, res) {
       const customerName = String(body.customerName ?? '').trim()
       const phone = String(body.phone ?? '').trim()
       const customerTypeId = Number(body.customerTypeId) || 1
+      const isRetailer = (body.isRetailer || body.is_retailer) ? 1 : 0
 
       if (!customerName || !phone) {
         return res.status(400).json({ success: false, message: 'Name and phone are required' })
       }
 
       const result = await db.execute({
-        sql: `INSERT INTO customers (customer_name, phone, customer_type_id) VALUES (?, ?, ?)`,
-        args: [customerName, phone, customerTypeId],
+        sql: `INSERT INTO customers (customer_name, phone, customer_type_id, is_retailer) VALUES (?, ?, ?, ?)`,
+        args: [customerName, phone, customerTypeId, isRetailer],
       })
 
       const newId = Number(result.lastInsertRowid)
       const fetchRes = await db.execute({
         sql: `
-          SELECT c.id, c.customer_name, c.phone, c.customer_type_id, ct.type_name, ct.markup_percentage
+          SELECT c.id, c.customer_name, c.phone, c.customer_type_id, COALESCE(c.is_retailer, 0) AS is_retailer, ct.type_name, ct.markup_percentage
           FROM customers c
           JOIN customer_types ct ON c.customer_type_id = ct.id
           WHERE c.id = ?
@@ -69,6 +71,33 @@ export default async function handler(req, res) {
     } catch (error) {
       console.error('Create customer error:', error)
       return res.status(500).json({ success: false, message: 'Failed to create customer', error: String(error) })
+    }
+  }
+
+  if (method === 'PUT') {
+    try {
+      const id = Number(req.query.id || req.body?.id)
+      const body = req.body || {}
+      const customerName = String(body.customerName ?? '').trim()
+      const phone = String(body.phone ?? '').trim()
+      const customerTypeId = Number(body.customerTypeId) || 1
+      const isRetailer = (body.isRetailer !== undefined || body.is_retailer !== undefined)
+        ? (body.isRetailer || body.is_retailer ? 1 : 0)
+        : 0
+
+      if (!id || !customerName) {
+        return res.status(400).json({ success: false, message: 'ID and customer name are required' })
+      }
+
+      await db.execute({
+        sql: `UPDATE customers SET customer_name = ?, phone = ?, customer_type_id = ?, is_retailer = ? WHERE id = ?`,
+        args: [customerName, phone, customerTypeId, isRetailer, id],
+      })
+
+      return res.status(200).json({ success: true, message: 'Customer updated successfully' })
+    } catch (error) {
+      console.error('Update customer error:', error)
+      return res.status(500).json({ success: false, message: 'Failed to update customer', error: String(error) })
     }
   }
 

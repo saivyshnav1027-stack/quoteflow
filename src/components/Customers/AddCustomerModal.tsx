@@ -1,15 +1,16 @@
 import React, { useState } from 'react'
-import { X, Loader2 } from 'lucide-react'
+import { X, Loader2, Store } from 'lucide-react'
 
 export interface AddCustomerModalProps {
   isOpen: boolean
   onClose: () => void
-  onSubmit: (customerName: string, phone: string) => Promise<void>
+  onSubmit: (customerName: string, phone: string, isRetailer?: boolean) => Promise<void>
 }
 
 export const AddCustomerModal: React.FC<AddCustomerModalProps> = ({ isOpen, onClose, onSubmit }) => {
   const [name, setName] = useState('')
   const [phone, setPhone] = useState('')
+  const [isRetailer, setIsRetailer] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   if (!isOpen) return null
@@ -20,9 +21,10 @@ export const AddCustomerModal: React.FC<AddCustomerModalProps> = ({ isOpen, onCl
 
     setIsSubmitting(true)
     try {
-      await onSubmit(name.trim(), phone.trim())
+      await onSubmit(name.trim(), phone.trim(), isRetailer)
       setName('')
       setPhone('')
+      setIsRetailer(false)
       onClose()
     } finally {
       setIsSubmitting(false)
@@ -30,8 +32,8 @@ export const AddCustomerModal: React.FC<AddCustomerModalProps> = ({ isOpen, onCl
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
-      <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm animate-fade-in">
+      <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl border border-slate-100">
         <div className="flex items-center justify-between pb-4 border-b border-slate-100">
           <h3 className="text-base font-bold text-slate-800">Add New Customer</h3>
           <button onClick={onClose} className="text-slate-400 hover:text-slate-600 cursor-pointer">
@@ -60,6 +62,28 @@ export const AddCustomerModal: React.FC<AddCustomerModalProps> = ({ isOpen, onCl
               className="w-full rounded-xl border border-slate-200 px-3.5 py-2 text-sm outline-none focus:border-blue-500"
             />
           </div>
+
+          {/* Retailer / Village Reseller Toggle */}
+          <div className="rounded-xl border border-slate-200 bg-slate-50/80 p-3">
+            <label className="flex items-start gap-3 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={isRetailer}
+                onChange={(e) => setIsRetailer(e.target.checked)}
+                className="mt-0.5 h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+              />
+              <div className="flex-1">
+                <div className="flex items-center gap-1.5 text-xs font-bold text-slate-900">
+                  <Store className="h-3.5 w-3.5 text-indigo-600" />
+                  <span>Village Retailer / Reseller Account</span>
+                </div>
+                <p className="text-[11px] text-slate-500 mt-0.5 leading-snug">
+                  Enables historical party-wise rate memory in Estimator and protects their estimates from routine cleanups.
+                </p>
+              </div>
+            </label>
+          </div>
+
           <div className="flex justify-end gap-2 pt-2">
             <button
               type="button"
